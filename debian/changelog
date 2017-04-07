@@ -14,6 +14,11 @@ tigervnc (1.7.0+dfsg-7~rc1) unstable; urgency=high
     can crash the server by causing an integer overflow. (CVE-2017-7395)
   - Fix CConnection.cxx CConnection::CConnection. An unauthenticated client
     can cause a small memory leak in the server. (CVE-2017-7396)
+  * The tigervncserver wrapper script gives up and kills the server it
+    just started if it doesn't have its VNC-TCP and X11-unix sockets up and
+    running within a second. However, if a machine is a bit bogged down,
+    this can prevent starting the server at all, for no good reason.
+    Thus, the timeout has been increased to 30 seconds. (Closes: #859141)
 
  -- Joachim Falk <joachim.falk@gmx.de>  Fri, 07 Apr 2017 22:39:47 +0200
 
