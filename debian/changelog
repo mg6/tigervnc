@@ -1,3 +1,22 @@
+tigervnc (1.7.0+dfsg-7~rc1) unstable; urgency=high
+
+  [ Joachim Falk ]
+  * Fixed the following security vulnerabilities (Closes: #859259):
+  - Fix SSecurityVeNCrypt.cxx; SSecurityVeNCrypt::SSecurityVeNCrypt.
+    An unauthenticated client can cause a small memory leak in the server.
+    (CVE-2017-7392)
+  - Fix VNCSConnectionST.cxx VNCSConnectionST::fence. An authenticated client
+    can cause a double free, leading to denial of service or potentially code
+    execution. (CVE-2017-7393)
+  - Fix SSecurityPlain.cxx SSecurityPlain::processMsg. An unauthenticated
+    users can crash the server by sending long usernames. (CVE-2017-7394)
+  - Fix SMsgReader.cxx SMsgReader::readClientCutText. An authenticated client
+    can crash the server by causing an integer overflow. (CVE-2017-7395)
+  - Fix CConnection.cxx CConnection::CConnection. An unauthenticated client
+    can cause a small memory leak in the server. (CVE-2017-7396)
+
+ -- Joachim Falk <joachim.falk@gmx.de>  Fri, 07 Apr 2017 22:39:47 +0200
+
 tigervnc (1.7.0+dfsg-6) unstable; urgency=high
 
   [ Joachim Falk ]

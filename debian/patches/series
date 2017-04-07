@@ -49,3 +49,9 @@ fix-xorg1.19-server-side-cursor.patch
 CVE-2014-8240-849479.patch
 CVE-2014-8241-849478.patch
 Fix-buffer-overflow-in-ModifiablePixelBuffer-fillRec.patch
+CVE-2017-7393-Prevent-double-free-by-crafted-fences.patch
+CVE-2017-7395-Fix-crash-from-integer-overflow-in-SMsgReader-readCl.patch
+CVE-2017-7396-Prevent-leak-of-SecurityServer-and-ClientServer.patch
+CVE-2017-7392-Delete-underlying-ssecurity-in-SSecurityVeNCrypt.patch
+CVE-2017-7394-0001-Fix-checkNoWait-logic-in-SSecurityPlain.patch
+CVE-2017-7394-0002-Limit-max-username-password-size-in-SSecurityPlain.patch
