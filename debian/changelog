@@ -19,6 +19,8 @@ tigervnc (1.7.0+dfsg-7~rc1) unstable; urgency=high
     running within a second. However, if a machine is a bit bogged down,
     this can prevent starting the server at all, for no good reason.
     Thus, the timeout has been increased to 30 seconds. (Closes: #859141)
+  * Refreshed dependencies for Xtigervnc server build from xorg-server-1.19.2
+    used in stretch. (Closes: #858048)
 
  -- Joachim Falk <joachim.falk@gmx.de>  Fri, 07 Apr 2017 22:39:47 +0200
 
