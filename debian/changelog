@@ -1,4 +1,4 @@
-tigervnc (1.7.0+dfsg-7~rc1) unstable; urgency=high
+tigervnc (1.7.0+dfsg-7) unstable; urgency=high
 
   [ Joachim Falk ]
   * Fixed the following security vulnerabilities (Closes: #859259):
@@ -22,7 +22,7 @@ tigervnc (1.7.0+dfsg-7~rc1) unstable; urgency=high
   * Refreshed dependencies for Xtigervnc server build from xorg-server-1.19.2
     used in stretch. (Closes: #858048)
 
- -- Joachim Falk <joachim.falk@gmx.de>  Fri, 07 Apr 2017 22:39:47 +0200
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sun, 09 Apr 2017 10:38:13 -0400
 
 tigervnc (1.7.0+dfsg-6) unstable; urgency=high
 
