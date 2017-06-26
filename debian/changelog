@@ -1,3 +1,11 @@
+tigervnc (1.7.0+dfsg-8) UNRELEASED; urgency=low
+
+  [ Joachim Falk ]
+  * Applied patch from Chris Lamb to enable reproducible builds
+    for TigerVNC (Closes: #865753).
+
+ -- Joachim Falk <joachim.falk@gmx.de> Mon, 26 Jun 2017 20:22:36 +0200
+
 tigervnc (1.7.0+dfsg-7) unstable; urgency=high
 
   [ Joachim Falk ]

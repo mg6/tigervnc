@@ -54,6 +54,7 @@ DEB_CMAKE_EXTRA_FLAGS += -DCMAKE_C_FLAGS:STRING="$(CPPFLAGS) $(CFLAGS) -fPIC"
 DEB_CMAKE_EXTRA_FLAGS += -DCMAKE_CXX_FLAGS:STRING="$(CPPFLAGS) $(CXXFLAGS) -fPIC"
 DEB_CMAKE_EXTRA_FLAGS += -DCMAKE_EXE_LINKER_FLAGS="$(LDFLAGS)"
 DEB_CMAKE_EXTRA_FLAGS += -DCMAKE_SHARED_LINKER_FLAGS="$(LDFLAGS)"
+DEB_CMAKE_EXTRA_FLAGS += -DBUILD_TIMESTAMP="$(shell dpkg-parsechangelog -SDate | date -u -f- '+%Y-%m-%d %H:%M')"
 
 # This is stolen from xorg-server/debian/xsfbs/xsfbs.mk
 # Determine (source) package name from Debian changelog.
