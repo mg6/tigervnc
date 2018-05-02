@@ -99,7 +99,7 @@ sub getCommand {
   my ($cmd) = @_;
   return $CMDS{$cmd} if defined $CMDS{$cmd};
   print STDERR "$PROG: Couldn't find \"$cmd\" on your PATH.\n";
-  &installPackageError("tigenvnc-common") if $cmd eq 'tigervncpasswd';
+  &installPackageError("tigervnc-common") if $cmd eq 'tigervncpasswd';
   &installPackageError("openssl") if $cmd eq 'openssl';
   &installPackageError("x11-utils") if $cmd eq 'xdpyinfo';
   exit 1;
