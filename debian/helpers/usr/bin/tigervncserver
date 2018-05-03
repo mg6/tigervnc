@@ -3,11 +3,12 @@
 #
 # vncserver - wrapper script to start an X VNC server.
 #
-# Copyright (C) 2004-2017 Joachim Falk <joachim.falk@gmx.de>
+# Copyright (C) 2004-2018 Joachim Falk <joachim.falk@gmx.de>
 # Please report all errors to Joachim Falk and not to OL.
 #
 # This file is based on a vncserver script provided by:
 #
+#  Copyright (C) 2017 Philipp Wolski <philipp.wolski@kisters.de>
 #  Copyright (C) 2004 Ola Lundqvist <opal@debian.org>
 #  Copyright (C) 2004 Marcus Brinkmann <Marcus.Brinkmann@ruhr-uni-bochum.de>
 #  Copyright (C) 2004 Dirk Eddelbuettel <edd@debian.org>
@@ -692,6 +693,10 @@ sub startXvncServer {
   my $desktopLog = &desktopLog($options);
   my $pidFile    = &pidFile($options);
   
+  if ($options->{'rfbport'}) {
+    $vncPort = $options->{'rfbport'};
+  }
+  
   # Make sure the user has a password if required.
   &CreateVNCPasswd($options);
   # Make sure the user has a x509 certificate if required.
@@ -791,7 +796,7 @@ sub startXvncServer {
   {
     my $i = 300;
     for (; $i >= 0; $i = $i-1) {
-      last if &checkTCPPortUsed(5900 + $options->{'displayNumber'});
+      last if &checkTCPPortUsed($vncPort);
       if ($xvncServerPid == waitpid($xvncServerPid, WNOHANG)) { $i = -2; last; }
       usleep 100000;
     }
@@ -947,6 +952,7 @@ sub usage {
     $prefix."[-xdisplaydefaults]    Get geometry and pixelformat from running X\n".
     $prefix."[-wmDecoration <dim>]  Shrink geometry from xdisplaydefaults by dim\n".
     $prefix."[-localhost yes|no]    Only accept VNC connections from localhost\n".
+    $prefix."[-rfbport port]        TCP port to listen for RFB protocol\n".
     $prefix."[-httpPort     port]   Port of internal http server\n".
     $prefix."[-baseHttpPort port]   Calculate http port from base port + display nr\n".
     $prefix."[-fg]                  No daemonization and\n".
@@ -1039,6 +1045,7 @@ sub main {
       pixelformat		=> undef,
       getDefaultFrom		=> undef,
       rfbwait			=> 30000,
+      rfbport			=> undef,
       localhost			=> undef,
       SecurityTypes		=>
         undef, # later derived depening on localhost setting
@@ -1213,6 +1220,7 @@ SCRIPTEOF
       'X509Key=s'	  => \$opts{'X509Key'},
       'X509Cert=s'	  => \$opts{'X509Cert'},
       'I-KNOW-THIS-IS-INSECURE' => \$options->{'I-KNOW-THIS-IS-INSECURE'},
+      'rfbport=i'         => \$options->{'rfbport'},
     );
     
     &usage(!$rc) if (!$rc || $opts{'help'});
@@ -1265,6 +1273,7 @@ SCRIPTEOF
         push @cmd, "-xstartup", $opts{'vncStartup'} if !$opts{'noxstartup'} && defined $opts{'vncStartup'};
         push @cmd, "-autokill" if $opts{'autokill'};
         push @cmd, "-httpPort", $options->{'httpPort'} if ($options->{'httpPort'});
+        push @cmd, "-rfbport", $options->{'rfbport'} if ($options->{'rfbport'});
         push @cmd, "-baseHttpPort", $options->{'baseHttpPort'} if ($options->{'baseHttpPort'});
         push @cmd, "-localhost", $options->{'localhost'} if defined $options->{'localhost'};
         push @cmd, "-useold" if $opts{'useold'};
