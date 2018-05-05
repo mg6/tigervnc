@@ -689,12 +689,12 @@ sub startXvncServer {
   my ($options) = @_;
   my $vncStartup = $options->{'vncStartup'};
   my $xstartupArg= $options->{'xstartupArgSpecified'};
-  my $vncPort    = 5900 + $options->{'displayNumber'};
+  my $rfbport    = 5900 + $options->{'displayNumber'};
   my $desktopLog = &desktopLog($options);
   my $pidFile    = &pidFile($options);
   
   if ($options->{'rfbport'}) {
-    $vncPort = $options->{'rfbport'};
+    $rfbport = $options->{'rfbport'};
   }
   
   # Make sure the user has a password if required.
@@ -753,7 +753,7 @@ sub startXvncServer {
     push @cmd, '-pixelformat', $options->{'pixelformat'} if $options->{'pixelformat'};
     push @cmd, '-rfbwait', $options->{'rfbwait'};
     push @cmd, '-rfbauth', $options->{'vncPasswdFile'} if $options->{'vncAuthEnabled'};
-    push @cmd, '-rfbport', $vncPort;
+    push @cmd, '-rfbport', $rfbport;
     push @cmd, '-pn';
     push @cmd, '-localhost' if $options->{'localhost'} =~ m/^(?:yes|true|1)$/i;
     push @cmd, '-fp', $options->{'fontPath'} if $options->{'fontPath'};
@@ -796,7 +796,7 @@ sub startXvncServer {
   {
     my $i = 300;
     for (; $i >= 0; $i = $i-1) {
-      last if &checkTCPPortUsed($vncPort);
+      last if &checkTCPPortUsed($rfbport);
       if ($xvncServerPid == waitpid($xvncServerPid, WNOHANG)) { $i = -2; last; }
       usleep 100000;
     }
@@ -841,11 +841,14 @@ sub startXvncServer {
     push @cmd, "-SecurityTypes", $options->{'SecurityTypes'};
     push @cmd, "-X509CA", $options->{'X509Cert'} if $options->{'x509CertRequired'};
     push @cmd, "-passwd", $options->{'vncPasswdFile'} if $options->{'vncAuthEnabled'};
-    if ($options->{'localhost'} =~ m/^(?:yes|true|1)$/i) {
-      push @cmd, ":$options->{'displayNumber'}";
+    my $connection = $options->{'localhost'} =~ m/^(?:yes|true|1)$/i
+      ? ":" : "$HOSTFQDN:";
+    if ($rfbport >= 5900 && $rfbport <= 5999) {
+      $connection .= $rfbport-5900;
     } else {
-      push @cmd, "$HOSTFQDN:$options->{'displayNumber'}";
+      $connection .= $rfbport;
     }
+    push @cmd, $connection;
     print "Use ".join(" ", @cmd)." to connect to the VNC server.\n\n";
   }
 
@@ -1299,12 +1302,8 @@ SCRIPTEOF
       }
       if (!$opts{'kill'} && !$opts{'list'}) {
         # Feedback on how to connect to the remote tigervnc server.
-        if (defined $options->{'displayNumber'}) {
-          print "Use xtigervncviewer -via $options->{'displayHost'} :$options->{'displayNumber'} to connect!\n";
-        } else {
-          print "Use xtigervncviewer -via $options->{'displayHost'} :n to connect!\n";
-          print "The display number :n is given in the above startup message from tigervncserver.\n";
-        }
+        print "Use xtigervncviewer -via $options->{'displayHost'} :n to connect!\n";
+        print "The display number :n is given in the above startup message from tigervncserver.\n";
       }
       exit 0;
     }
