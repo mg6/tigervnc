@@ -180,9 +180,14 @@ reverse-patches-remove-xorg-from-vnc-tree:
 
 configure/tigervnc-standalone-server configure/tigervnc-xorg-extension:: $(DEB_BUILDDIR)/unix/xserver/configure.stamp
 
--include /usr/share/xserver-xorg/configure_flags.mk
+# Unfortunately quoting in /usr/share/xserver-xorg/configure_flags.mk is fucked
+# up in buster and ${xxx} is not escaped correctly.
+xserver_confflags := $(shell cat /usr/share/xserver-xorg/configure_flags.mk | \
+  sed -ne '/^xserver_confflags\s*=/{s/^[^=]*=//;s/--with-builderstring="[^"]*"//;p}')
 
-xserver_confflags := $(shell echo '$(xserver_confflags)' | sed 's/--with-builderstring="[^"]*"//')
+#-include /usr/share/xserver-xorg/configure_flags.mk
+#xserver_confflags := $(shell echo '$(xserver_confflags)' | sed 's/--with-builderstring="[^"]*"//')
+
 XORG_DEBIAN_CONFIGURE_FLAGS = \
 	$(filter-out \
 		--prefix=% \
@@ -252,10 +257,6 @@ install/tigervnc-viewer::
 
 install/tigervnc-standalone-server install/tigervnc-xorg-extension::
 	$(MAKE) -C $(DEB_BUILDDIR)/unix/xserver/hw/vnc DESTDIR=$(DEB_DESTDIR) install
-	# This installs libvnc.so in $(DEB_DESTDIR)/lib but we can not move it here for some reason.
-	# Most likely due to parallel processes runing the same commands.
-	#mv -f $(DEB_DESTDIR)/lib $(DEB_DESTDIR)/usr
-	# Instead the directory is moved in common-binary-impl.stamp
 
 common-binary-arch:: debian/tmp/common-binary-impl.stamp
 
@@ -281,8 +282,6 @@ debian/tmp/common-binary-impl.stamp:
 	    gzip -9 > $$line.gz; \
 	  rm -f $$line; \
 	done
-	# Hackish build fix. No clue why this directory has vanished from here.
-	mv $(DEB_DESTDIR)/lib $(DEB_DESTDIR)/usr
 	touch $@
 
 clean::

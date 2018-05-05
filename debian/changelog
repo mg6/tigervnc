@@ -4,6 +4,10 @@ tigervnc (1.7.0+dfsg-9~RC1) UNRELEASED; urgency=high
   * Fixed typo in tigervncserver wrapper script (Closes: #881276).
   * In /etc/X11/Xvnc-session, $SHELL should be quoted (Closes: #866061).
   * Updated Vcs-* fields in control to use new gitlab at salsa.debian.org.
+  * Fixed underlying reason for bug #880308. Unfortunately, quoting in
+    /usr/share/xserver-xorg/configure_flags.mk is fucked up in buster and
+    ${xxx} is not escaped correctly. We now work around this problem
+    and now again use consistent configure flags to build Xtigervnc.
 
   [ Philipp Wolski ]
   * Added rfbport to supported commandline arguments for
