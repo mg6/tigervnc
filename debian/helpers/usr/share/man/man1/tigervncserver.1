@@ -29,6 +29,8 @@ tigervncserver \- start or stop a TigerVNC server
 .RB [ \-noxstartup ]
 .RB [ \-xstartup
 .IR script ]
+.RB [ \-rfbport
+.IR port# ]
 .RB [ \-httpPort
 .IR port# ]
 .RB [ \-baseHttpPort
@@ -203,6 +205,11 @@ This option allows you to manually start a window manager in your TigerVNC sessi
 .B \-xstartup \fIscript\fP
 Run a custom startup script, instead of $HOME/.vnc/Xvnc-session, after launching Xtigervnc.
 This is useful to run full-screen applications.
+.
+.TP
+.B \-rfbport \fIport#\fP
+Specifies the TCP port on which Xtigervnc listens for connections from viewers (the protocol used in VNC is called RFB - "remote framebuffer").
+The default is 5900 plus the display number display#.
 .
 .TP
 .B \-httpPort \fIport#\fP
