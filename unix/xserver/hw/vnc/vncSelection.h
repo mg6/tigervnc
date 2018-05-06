@@ -1,4 +1,4 @@
-/* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
+/* Copyright 2016 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,17 +15,19 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  * USA.
  */
+#ifndef __SELECTION_H__
+#define __SELECTION_H__
 
-// -=- Threading.h
-// General purpose threading interface.
-// If the current platform supports threading then __RFB_THREADING_IMPL
-// will be defined after this header has been included.
-
-#ifndef __RFB_THREADING_H__
-#define __RFB_THREADING_H__
-
-#ifdef WIN32
-#include <rfb_win32/Threading.h>
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-#endif // __RFB_THREADING_H__
+void vncSelectionInit(void);
+
+void vncClientCutText(const char* str, int len);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

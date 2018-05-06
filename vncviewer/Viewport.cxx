@@ -62,15 +62,6 @@
 #include "vncviewer.h"
 
 #include "PlatformPixelBuffer.h"
-#include "FLTKPixelBuffer.h"
-
-#if defined(WIN32)
-#include "Win32PixelBuffer.h"
-#elif defined(__APPLE__)
-#include "OSXPixelBuffer.h"
-#else
-#include "X11PixelBuffer.h"
-#endif
 
 #include <FL/fl_draw.H>
 #include <FL/fl_ask.H>
@@ -111,7 +102,7 @@ Viewport::Viewport(int w, int h, const rfb::PixelFormat& serverPF, CConn* cc_)
   // We need to intercept keyboard events early
   Fl::add_system_handler(handleSystemEvent, this);
 
-  frameBuffer = createFramebuffer(w, h);
+  frameBuffer = new PlatformPixelBuffer(w, h);
   assert(frameBuffer);
   cc->setFramebuffer(frameBuffer);
 
@@ -189,21 +180,20 @@ static const char * dotcursor_xpm[] = {
   "     "};
 
 void Viewport::setCursor(int width, int height, const Point& hotspot,
-                              void* data, void* mask)
+                         const rdr::U8* data)
 {
+  int i;
+
   if (cursor) {
     if (!cursor->alloc_array)
       delete [] cursor->array;
     delete cursor;
   }
 
-  int mask_len = ((width+7)/8) * height;
-  int i;
+  for (i = 0; i < width*height; i++)
+    if (data[i*4 + 3] != 0) break;
 
-  for (i = 0; i < mask_len; i++)
-    if (((rdr::U8*)mask)[i]) break;
-
-  if ((i == mask_len) && dotWhenNoCursor) {
+  if ((i == width*height) && dotWhenNoCursor) {
     vlog.debug("cursor is empty - using dot");
 
     Fl_Pixmap pxm(dotcursor_xpm);
@@ -216,40 +206,28 @@ void Viewport::setCursor(int width, int height, const Point& hotspot,
       cursor = new Fl_RGB_Image(buffer, 1, 1, 4);
       cursorHotspot.x = cursorHotspot.y = 0;
     } else {
-      U8 *buffer = new U8[width*height*4];
-      U8 *i, *o, *m;
-      int m_width;
-
-      const PixelFormat *pf;
-      
-      pf = &cc->cp.pf();
-
-      i = (U8*)data;
-      o = buffer;
-      m = (U8*)mask;
-      m_width = (width+7)/8;
-      for (int y = 0;y < height;y++) {
-        for (int x = 0;x < width;x++) {
-          pf->rgbFromBuffer(o, i, 1);
-
-          if (m[(m_width*y)+(x/8)] & 0x80>>(x%8))
-            o[3] = 255;
-          else
-            o[3] = 0;
-
-          o += 4;
-          i += pf->bpp/8;
-        }
-      }
-
+      U8 *buffer = new U8[width * height * 4];
+      memcpy(buffer, data, width * height * 4);
       cursor = new Fl_RGB_Image(buffer, width, height, 4);
-
       cursorHotspot = hotspot;
     }
   }
 
   if (Fl::belowmouse() == this)
     window()->cursor(cursor, cursorHotspot.x, cursorHotspot.y);
+}
+
+
+void Viewport::draw(Surface* dst)
+{
+  int X, Y, W, H;
+
+  // Check what actually needs updating
+  fl_clip_box(x(), y(), w(), h(), X, Y, W, H);
+  if ((W == 0) || (H == 0))
+    return;
+
+  frameBuffer->draw(dst, X - x(), Y - y(), X, Y, W, H);
 }
 
 
@@ -272,7 +250,7 @@ void Viewport::resize(int x, int y, int w, int h)
     vlog.debug("Resizing framebuffer from %dx%d to %dx%d",
                frameBuffer->width(), frameBuffer->height(), w, h);
 
-    frameBuffer = createFramebuffer(w, h);
+    frameBuffer = new PlatformPixelBuffer(w, h);
     assert(frameBuffer);
     cc->setFramebuffer(frameBuffer);
   }
@@ -374,34 +352,14 @@ int Viewport::handle(int event)
   return Fl_Widget::handle(event);
 }
 
-
-PlatformPixelBuffer* Viewport::createFramebuffer(int w, int h)
-{
-  PlatformPixelBuffer *fb;
-
-  try {
-#if defined(WIN32)
-    fb = new Win32PixelBuffer(w, h);
-#elif defined(__APPLE__)
-    fb = new OSXPixelBuffer(w, h);
-#else
-    fb = new X11PixelBuffer(w, h);
-#endif
-  } catch (rdr::Exception& e) {
-    vlog.error(_("Unable to create platform specific framebuffer: %s"), e.str());
-    vlog.error(_("Using platform independent framebuffer"));
-    fb = new FLTKPixelBuffer(w, h);
-  }
-
-  return fb;
-}
-
-
 void Viewport::handleClipboardChange(int source, void *data)
 {
   Viewport *self = (Viewport *)data;
 
   assert(self);
+
+  if (!sendClipboard)
+    return;
 
 #if !defined(WIN32) && !defined(__APPLE__)
   if (!sendPrimary && (source == 0))

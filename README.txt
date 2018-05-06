@@ -34,7 +34,7 @@ Incomplete and generally out of date copyright list:
         Copyright (C) 2009-2011 D. R. Commander
         Copyright (C) 2009-2011 Pierre Ossman for Cendio AB
         Copyright (C) 2004, 2009-2011 Red Hat, Inc.
-        Copyright (C) 2009-2016 TigerVNC Team
+        Copyright (C) 2009-2017 TigerVNC Team
         All Rights Reserved.
 
 This software is distributed under the GNU General Public Licence as published
@@ -64,9 +64,8 @@ The Windows version of TigerVNC contains the following programs:
   winvnc - the TigerVNC Server for Windows.  winvnc allows a Windows desktop to
            be accessed remotely using a VNC viewer.
 
-The Windows version of TigerVNC should work on Windows 2000 and later.  On
-Windows XP and later, winvnc may not work if the Fast User Switching or Remote
-Desktop features are in use.
+winvnc may not work if the Fast User Switching or Remote Desktop features are
+in use.
 
 
 Unix/Linux-Specific (not Mac)

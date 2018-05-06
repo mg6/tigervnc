@@ -1,4 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
+ * Copyright 2011-2017 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,7 +44,6 @@ CConnection::CConnection()
     state_(RFBSTATE_UNINITIALISED), useProtocol3_3(false),
     framebuffer(NULL), decoder(this)
 {
-  security = new SecurityClient();
 }
 
 CConnection::~CConnection()
@@ -86,7 +86,7 @@ void CConnection::setFramebuffer(ModifiablePixelBuffer* fb)
 
     if (fb->width() > framebuffer->width()) {
       rect.setXYWH(framebuffer->width(), 0,
-                   fb->width() - fb->width(),
+                   fb->width() - framebuffer->width(),
                    fb->height());
       fb->fillRect(rect, black);
     }
@@ -166,7 +166,7 @@ void CConnection::processSecurityTypesMsg()
   int secType = secTypeInvalid;
 
   std::list<rdr::U8> secTypes;
-  secTypes = security->GetEnabledSecTypes();
+  secTypes = security.GetEnabledSecTypes();
 
   if (cp.isVersion(3,3)) {
 
@@ -234,7 +234,7 @@ void CConnection::processSecurityTypesMsg()
   }
 
   state_ = RFBSTATE_SECURITY;
-  csecurity = security->GetCSecurity(secType);
+  csecurity = security.GetCSecurity(secType);
   processSecurityMsg();
 }
 
@@ -318,6 +318,13 @@ void CConnection::setExtendedDesktopSize(unsigned reason,
   decoder.flush();
 
   CMsgHandler::setExtendedDesktopSize(reason, result, w, h, layout);
+}
+
+void CConnection::readAndDecodeRect(const Rect& r, int encoding,
+                                    ModifiablePixelBuffer* pb)
+{
+  decoder.decodeRect(r, encoding, pb);
+  decoder.flush();
 }
 
 void CConnection::framebufferUpdateStart()

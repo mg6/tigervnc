@@ -2,10 +2,12 @@ cmake_minimum_required(VERSION 2.8)
 
 project(tigervnc-java Java)
 if(NOT VERSION)
-  set(VERSION 1.7.0)
+  set(VERSION 1.8.0)
 endif()
 
 find_package(Java)
+
+set(DATA_DIR "${CMAKE_INSTALL_PREFIX}/share")
 
 set(DEFAULT_JAVACFLAGS "-source 1.6 -target 1.6 -Xlint:all,-serial,-cast,-unchecked,-fallthrough,-dep-ann,-deprecation,-rawtypes")
 set(JAVACFLAGS ${DEFAULT_JAVACFLAGS} CACHE STRING

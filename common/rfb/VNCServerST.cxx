@@ -1,5 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
- * Copyright 2009-2014 Pierre Ossman for Cendio AB
+ * Copyright 2009-2017 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -66,12 +66,6 @@ using namespace rfb;
 static LogWriter slog("VNCServerST");
 LogWriter VNCServerST::connectionsLog("Connections");
 
-rfb::IntParameter deferUpdateTime("DeferUpdate",
-                                  "Time in milliseconds to defer updates",1);
-
-rfb::BoolParameter alwaysSetDeferUpdateTimer("AlwaysSetDeferUpdateTimer",
-                  "Always reset the defer update timer on every change",false);
-
 //
 // -=- VNCServerST Implementation
 //
@@ -82,10 +76,11 @@ VNCServerST::VNCServerST(const char* name_, SDesktop* desktop_)
   : blHosts(&blacklist), desktop(desktop_), desktopStarted(false),
     blockCounter(0), pb(0),
     name(strDup(name_)), pointerClient(0), comparer(0),
+    cursor(new Cursor(0, 0, Point(), NULL)),
     renderedCursorInvalid(false),
     queryConnectionHandler(0), keyRemapper(&KeyRemapper::defInstance),
     lastConnectionTime(0), disableclients(false),
-    deferTimer(this), deferPending(false)
+    frameTimer(this)
 {
   lastUserInputTime = lastDisconnectTime = time(0);
   slog.debug("creating single-threaded server %s", name.buf);
@@ -97,6 +92,9 @@ VNCServerST::~VNCServerST()
 
   // Close any active clients, with appropriate logging & cleanup
   closeClients("Server shutdown");
+
+  // Stop trying to render things
+  stopFrameClock();
 
   // Delete all the clients, and their sockets, and any closing sockets
   //   NB: Deleting a client implicitly removes it from the clients list
@@ -110,7 +108,11 @@ VNCServerST::~VNCServerST()
     desktop->stop();
   }
 
+  if (comparer)
+    comparer->logStats();
   delete comparer;
+
+  delete cursor;
 }
 
 
@@ -155,6 +157,10 @@ void VNCServerST::removeSocket(network::Socket* sock) {
         desktopStarted = false;
         desktop->stop();
       }
+
+      if (comparer)
+        comparer->logStats();
+
       return;
     }
   }
@@ -277,6 +283,8 @@ int VNCServerST::checkTimeouts()
 void VNCServerST::blockUpdates()
 {
   blockCounter++;
+
+  stopFrameClock();
 }
 
 void VNCServerST::unblockUpdates()
@@ -285,13 +293,18 @@ void VNCServerST::unblockUpdates()
 
   blockCounter--;
 
-  // Flush out any updates we might have blocked
-  if (blockCounter == 0)
-    tryUpdate();
+  // Restart the frame clock if we have updates
+  if (blockCounter == 0) {
+    if (!comparer->is_empty())
+      startFrameClock();
+  }
 }
 
 void VNCServerST::setPixelBuffer(PixelBuffer* pb_, const ScreenSet& layout)
 {
+  if (comparer)
+    comparer->logStats();
+
   pb = pb_;
   delete comparer;
   comparer = 0;
@@ -305,7 +318,6 @@ void VNCServerST::setPixelBuffer(PixelBuffer* pb_, const ScreenSet& layout)
   }
 
   comparer = new ComparingUpdateTracker(pb);
-  cursor.setPF(pb->getPF());
   renderedCursorInvalid = true;
 
   // Make sure that we have at least one screen
@@ -406,8 +418,7 @@ void VNCServerST::add_changed(const Region& region)
     return;
 
   comparer->add_changed(region);
-  startDefer();
-  tryUpdate();
+  startFrameClock();
 }
 
 void VNCServerST::add_copied(const Region& dest, const Point& delta)
@@ -416,19 +427,15 @@ void VNCServerST::add_copied(const Region& dest, const Point& delta)
     return;
 
   comparer->add_copied(dest, delta);
-  startDefer();
-  tryUpdate();
+  startFrameClock();
 }
 
 void VNCServerST::setCursor(int width, int height, const Point& newHotspot,
-                            const void* data, const void* mask)
+                            const rdr::U8* data)
 {
-  cursor.hotspot = newHotspot;
-  cursor.setSize(width, height);
-  cursor.imageRect(cursor.getRect(), data);
-  memcpy(cursor.mask.buf, mask, cursor.maskLen());
-
-  cursor.crop();
+  delete cursor;
+  cursor = new Cursor(width, height, newHotspot, data);
+  cursor->crop();
 
   renderedCursorInvalid = true;
 
@@ -499,10 +506,14 @@ SConnection* VNCServerST::getSConnection(network::Socket* sock) {
 
 bool VNCServerST::handleTimeout(Timer* t)
 {
-  if (t != &deferTimer)
-    return false;
+  if (t == &frameTimer) {
+    // We keep running until we go a full interval without any updates
+    if (comparer->is_empty())
+      return false;
 
-  tryUpdate();
+    writeUpdate();
+    return true;
+  }
 
   return false;
 }
@@ -538,86 +549,47 @@ inline bool VNCServerST::needRenderedCursor()
   return false;
 }
 
-inline void VNCServerST::startDefer()
+void VNCServerST::startFrameClock()
 {
-  if (deferUpdateTime == 0)
+  if (frameTimer.isStarted())
     return;
-
-  if (deferPending && !alwaysSetDeferUpdateTimer)
-    return;
-
-  gettimeofday(&deferStart, NULL);
-  deferTimer.start(deferUpdateTime);
-
-  deferPending = true;
-}
-
-inline bool VNCServerST::checkDefer()
-{
-  if (!deferPending)
-    return true;
-
-  if (msSince(&deferStart) >= (unsigned)deferUpdateTime)
-    return true;
-
-  return false;
-}
-
-void VNCServerST::tryUpdate()
-{
-  std::list<VNCSConnectionST*>::iterator ci, ci_next;
-
   if (blockCounter > 0)
     return;
 
-  if (!checkDefer())
-    return;
-
-  for (ci = clients.begin(); ci != clients.end(); ci = ci_next) {
-    ci_next = ci; ci_next++;
-    (*ci)->writeFramebufferUpdateOrClose();
-  }
+  frameTimer.start(1000/rfb::Server::frameRate);
 }
 
-// checkUpdate() is called just before sending an update.  It checks to see
-// what updates are pending and propagates them to the update tracker for each
-// client.  It uses the ComparingUpdateTracker's compare() method to filter out
-// areas of the screen which haven't actually changed.  It also checks the
-// state of the (server-side) rendered cursor, if necessary rendering it again
-// with the correct background.
+void VNCServerST::stopFrameClock()
+{
+  frameTimer.stop();
+}
 
-bool VNCServerST::checkUpdate()
+// writeUpdate() is called on a regular interval in order to see what
+// updates are pending and propagates them to the update tracker for
+// each client. It uses the ComparingUpdateTracker's compare() method
+// to filter out areas of the screen which haven't actually changed. It
+// also checks the state of the (server-side) rendered cursor, if
+// necessary rendering it again with the correct background.
+
+void VNCServerST::writeUpdate()
 {
   UpdateInfo ui;
+  Region toCheck;
+
+  std::list<VNCSConnectionST*>::iterator ci, ci_next;
+
+  assert(blockCounter == 0);
+
   comparer->getUpdateInfo(&ui, pb->getRect());
+  toCheck = ui.changed.union_(ui.copied);
 
-  bool renderCursor = needRenderedCursor();
+  if (needRenderedCursor()) {
+    Rect clippedCursorRect = Rect(0, 0, cursor->width(), cursor->height())
+                             .translate(cursorPos.subtract(cursor->hotspot()))
+                             .intersect(pb->getRect());
 
-  if (ui.is_empty() && !(renderCursor && renderedCursorInvalid))
-    return true;
-
-  // Block clients as the frame buffer cannot be safely accessed
-  if (blockCounter > 0)
-    return false;
-
-  // Block client from updating if we are currently deferring updates
-  if (!checkDefer())
-    return false;
-
-  deferPending = false;
-
-  Region toCheck = ui.changed.union_(ui.copied);
-
-  if (renderCursor) {
-    Rect clippedCursorRect
-      = cursor.getRect(cursorPos.subtract(cursor.hotspot)).intersect(pb->getRect());
-
-    if (!renderedCursorInvalid && (toCheck.intersect(clippedCursorRect)
-                                   .is_empty())) {
-      renderCursor = false;
-    } else {
-      toCheck.assign_union(clippedCursorRect);
-    }
+    if (!toCheck.intersect(clippedCursorRect).is_empty())
+      renderedCursorInvalid = true;
   }
 
   pb->grabRegion(toCheck);
@@ -630,21 +602,40 @@ bool VNCServerST::checkUpdate()
   if (comparer->compare())
     comparer->getUpdateInfo(&ui, pb->getRect());
 
-  if (renderCursor) {
-    renderedCursor.update(pb, &cursor, cursorPos);
-    renderedCursorInvalid = false;
-  }
+  comparer->clear();
 
-  std::list<VNCSConnectionST*>::iterator ci, ci_next;
   for (ci = clients.begin(); ci != clients.end(); ci = ci_next) {
     ci_next = ci; ci_next++;
     (*ci)->add_copied(ui.copied, ui.copy_delta);
     (*ci)->add_changed(ui.changed);
+    (*ci)->writeFramebufferUpdateOrClose();
   }
+}
 
-  comparer->clear();
+// checkUpdate() is called by clients to see if it is safe to read from
+// the framebuffer at this time.
+
+bool VNCServerST::checkUpdate()
+{
+  // Block clients as the frame buffer cannot be safely accessed
+  if (blockCounter > 0)
+    return false;
+
+  // Block client from updating if there are pending updates
+  if (!comparer->is_empty())
+    return false;
 
   return true;
+}
+
+const RenderedCursor* VNCServerST::getRenderedCursor()
+{
+  if (renderedCursorInvalid) {
+    renderedCursor.update(pb, cursor, cursorPos);
+    renderedCursorInvalid = false;
+  }
+
+  return &renderedCursor;
 }
 
 void VNCServerST::getConnInfo(ListConnInfo * listConn)

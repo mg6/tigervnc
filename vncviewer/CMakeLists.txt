@@ -6,9 +6,9 @@ set(VNCVIEWER_SOURCES
   menukey.cxx
   CConn.cxx
   DesktopWindow.cxx
-  FLTKPixelBuffer.cxx
   UserDialog.cxx
   ServerDialog.cxx
+  Surface.cxx
   OptionsDialog.cxx
   PlatformPixelBuffer.cxx
   Viewport.cxx
@@ -33,11 +33,11 @@ elseif(APPLE)
 endif()
 
 if(WIN32)
-  set(VNCVIEWER_SOURCES ${VNCVIEWER_SOURCES} Win32PixelBuffer.cxx)
+  set(VNCVIEWER_SOURCES ${VNCVIEWER_SOURCES} Surface_Win32.cxx)
 elseif(APPLE)
-  set(VNCVIEWER_SOURCES ${VNCVIEWER_SOURCES} OSXPixelBuffer.cxx)
+  set(VNCVIEWER_SOURCES ${VNCVIEWER_SOURCES} Surface_OSX.cxx)
 else()
-  set(VNCVIEWER_SOURCES ${VNCVIEWER_SOURCES} X11PixelBuffer.cxx)
+  set(VNCVIEWER_SOURCES ${VNCVIEWER_SOURCES} Surface_X11.cxx)
 endif()
 
 if(WIN32 AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -47,6 +47,10 @@ else()
 endif()
 
 target_link_libraries(vncviewer rfb network rdr os ${FLTK_LIBRARIES} ${GETTEXT_LIBRARIES})
+
+if(WIN32)
+  target_link_libraries(vncviewer msimg32)
+endif()
 
 if(APPLE)
   target_link_libraries(vncviewer "-framework Cocoa" "-framework Carbon")
