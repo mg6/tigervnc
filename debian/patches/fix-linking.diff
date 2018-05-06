@@ -2,7 +2,7 @@ Index: pkg-tigervnc/CMakeLists.txt
 ===================================================================
 --- pkg-tigervnc.orig/CMakeLists.txt
 +++ pkg-tigervnc/CMakeLists.txt
-@@ -241,12 +241,18 @@ if(UNIX AND NOT APPLE)
+@@ -242,12 +242,18 @@ if(UNIX AND NOT APPLE)
    if(X11_Xinerama_FOUND)
      set(FLTK_LIBRARIES ${FLTK_LIBRARIES} ${X11_Xinerama_LIB})
    endif()
@@ -45,5 +45,5 @@ Index: pkg-tigervnc/vncviewer/CMakeLists.txt
 -target_link_libraries(vncviewer rfb network rdr os ${FLTK_LIBRARIES} ${GETTEXT_LIBRARIES})
 +target_link_libraries(vncviewer rfb network rdr os ${FLTK_LIBRARIES} ${GETTEXT_LIBRARIES} -lX11)
  
- if(APPLE)
-   target_link_libraries(vncviewer "-framework Cocoa" "-framework Carbon")
+ if(WIN32)
+   target_link_libraries(vncviewer msimg32)

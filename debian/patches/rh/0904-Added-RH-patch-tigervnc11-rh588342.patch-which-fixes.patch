@@ -13,9 +13,11 @@ expected. (BZ#588342)
  unix/xserver/hw/vnc/Input.cc |    7 +++++++
  1 files changed, 7 insertions(+), 0 deletions(-)
 
---- a/unix/xserver/hw/vnc/Input.c
-+++ b/unix/xserver/hw/vnc/Input.c
-@@ -124,6 +124,9 @@
+Index: pkg-tigervnc/unix/xserver/hw/vnc/Input.c
+===================================================================
+--- pkg-tigervnc.orig/unix/xserver/hw/vnc/Input.c
++++ pkg-tigervnc/unix/xserver/hw/vnc/Input.c
+@@ -126,6 +126,9 @@ void vncPointerButtonAction(int buttonMa
  	ValuatorMask mask;
  #endif
  
@@ -25,7 +27,7 @@ expected. (BZ#588342)
  	for (i = 0; i < BUTTONS; i++) {
  		if ((buttonMask ^ oldButtonMask) & (1 << i)) {
  			int action = (buttonMask & (1<<i)) ?
-@@ -163,6 +166,9 @@
+@@ -165,6 +168,9 @@ void vncPointerMove(int x, int y)
  	if (cursorPosX == x && cursorPosY == y)
  		return;
  

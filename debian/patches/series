@@ -2,40 +2,34 @@
 0151-make-cmake-enable-options-mandatory-if-turned-on.patch
 ### TEMP 0200-add-tcpwrappers-support.patch
 
-
-# These patches are lifted from RHEL 7.4 (tigervnc-1.8.0-2.el7_4.src.rpm)
-
 # These patches are lifted from RedHat
-# 0901-Apply-RH-patch-tigervnc-viewer-reparent.patch-which-.patch needs heavy porting, as tigervnc switched to fltk to unify their windows/unix codebases for vncviewer
-# yoh: needs rethinking given upstream changes
-# 0902-Add-RH-patch-tigervnc11-rh645755.patch-fix-signal-in.patch
-# 0903-Add-RH-patch-tigervnc11-rh628054-xorg.patch-which-fi.patch has been applied upstream
-0904-Added-RH-patch-tigervnc11-rh588342.patch-which-fixes.patch
-# Almost completely applied upstream
-0905-Added-RH-patch-tigervnc11-rh690245.patch-which-add-T.patch
-# applied upstream
-#0906-Added-RH-patch-tigervnc11-ldnow.patch-disabling-lazy.patch
-
+rh/0904-Added-RH-patch-tigervnc11-rh588342.patch-which-fixes.patch
+# These patches are lifted from RHEL 7.4 (tigervnc-1.8.0-2.el7_4.src.rpm)
+#rh/tigervnc-shebang.patch # not required as we have our own tigervncserver wrapper script
+rh/tigervnc-manpages.patch
+rh/tigervnc-cursor.patch
+#rh/tigervnc-xstartup.patch # not required as we have our own tigervncserver wrapper script
+#rh/tigervnc-1.3.1-CVE-2014-8240.patch # duplicate of CVE-2014-8240-849479.patch
+#rh/tigervnc-1.3.1-do-not-die-when-port-is-already-taken.patch # not required as we have our own tigervncserver wrapper script
+rh/tigervnc-working-tls-on-fips-systems.patch
 
 find-fltk-libs.diff
 fix-linking.diff
 
-f/tigervnc11-gethomedir.patch
-f/tigervnc-shebang.patch
-f/tigervnc-cursor.patch
+#f/tigervnc11-gethomedir.patch does not apply cleanly do we need this?
 
-fix-build-error-with-xserver-1.19.patch
-v2-Add-xorg-xserver-1.19-support-to-tigervnc.patch
-fix-xorg1.19-inetd-mode.patch
-fix-xorg1.19-server-side-cursor.patch
+#fix-build-error-with-xserver-1.19.patch # applied upstream in TigerVNC 1.8
+#v2-Add-xorg-xserver-1.19-support-to-tigervnc.patch # applied upstream in TigerVNC 1.8
+#fix-xorg1.19-inetd-mode.patch # applied upstream in TigerVNC 1.8
+#fix-xorg1.19-server-side-cursor.patch # applied upstream in TigerVNC 1.8
 
 # The following patches are security fixes
 CVE-2014-8240-849479.patch
 CVE-2014-8241-849478.patch
-Fix-buffer-overflow-in-ModifiablePixelBuffer-fillRec.patch
-CVE-2017-7393-Prevent-double-free-by-crafted-fences.patch
-CVE-2017-7395-Fix-crash-from-integer-overflow-in-SMsgReader-readCl.patch
-CVE-2017-7396-Prevent-leak-of-SecurityServer-and-ClientServer.patch
-CVE-2017-7392-Delete-underlying-ssecurity-in-SSecurityVeNCrypt.patch
-CVE-2017-7394-0001-Fix-checkNoWait-logic-in-SSecurityPlain.patch
-CVE-2017-7394-0002-Limit-max-username-password-size-in-SSecurityPlain.patch
+#Fix-buffer-overflow-in-ModifiablePixelBuffer-fillRec.patch # applied upstream in TigerVNC 1.8
+#CVE-2017-7393-Prevent-double-free-by-crafted-fences.patch # applied upstream in TigerVNC 1.8
+#CVE-2017-7395-Fix-crash-from-integer-overflow-in-SMsgReader-readCl.patch # applied upstream in TigerVNC 1.8
+#CVE-2017-7396-Prevent-leak-of-SecurityServer-and-ClientServer.patch # applied upstream in TigerVNC 1.8
+#CVE-2017-7392-Delete-underlying-ssecurity-in-SSecurityVeNCrypt.patch # applied upstream in TigerVNC 1.8
+#CVE-2017-7394-0001-Fix-checkNoWait-logic-in-SSecurityPlain.patch # applied upstream in TigerVNC 1.8
+#CVE-2017-7394-0002-Limit-max-username-password-size-in-SSecurityPlain.patch # applied upstream in TigerVNC 1.8

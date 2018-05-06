@@ -1,6 +1,8 @@
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -214,7 +214,8 @@
+Index: pkg-tigervnc/CMakeLists.txt
+===================================================================
+--- pkg-tigervnc.orig/CMakeLists.txt
++++ pkg-tigervnc/CMakeLists.txt
+@@ -228,7 +228,8 @@ endif()
  set(FLTK_SKIP_FLUID TRUE)
  set(FLTK_SKIP_OPENGL TRUE)
  set(FLTK_SKIP_FORMS TRUE)

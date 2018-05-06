@@ -1,4 +1,4 @@
-tigervnc (1.7.0+dfsg-9~RC1) UNRELEASED; urgency=high
+tigervnc (1.8.0+dfsg-1~RC1) UNRELEASED; urgency=high
 
   [ Joachim Falk ]
   * Fixed typo in tigervncserver wrapper script (Closes: #881276).
@@ -13,7 +13,7 @@ tigervnc (1.7.0+dfsg-9~RC1) UNRELEASED; urgency=high
   * Added rfbport to supported commandline arguments for
     tightvncserver wrapper (closes: #867175)
 
- -- Joachim Falk <joachim.falk@gmx.de>  Wed, 02 May 2018 20:56:28 +0200
+ -- Joachim Falk <joachim.falk@gmx.de>  Sun, 06 May 2018 23:30:44 +0200
 
 tigervnc (1.7.0+dfsg-8) unstable; urgency=high
 
