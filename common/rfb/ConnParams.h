@@ -77,7 +77,7 @@ namespace rfb {
     const char* name() const { return name_; }
     void setName(const char* name);
 
-    const Cursor& cursor() const { return cursor_; }
+    const Cursor& cursor() const { return *cursor_; }
     void setCursor(const Cursor& cursor);
 
     bool supportsEncoding(rdr::S32 encoding) const;
@@ -88,6 +88,7 @@ namespace rfb {
 
     bool supportsLocalCursor;
     bool supportsLocalXCursor;
+    bool supportsLocalCursorWithAlpha;
     bool supportsDesktopResize;
     bool supportsExtendedDesktopSize;
     bool supportsDesktopRename;
@@ -106,7 +107,7 @@ namespace rfb {
 
     PixelFormat pf_;
     char* name_;
-    Cursor cursor_;
+    Cursor* cursor_;
     std::set<rdr::S32> encodings_;
     char verStr[13];
     int verStrPos;

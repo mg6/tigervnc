@@ -127,16 +127,6 @@ namespace rfb {
     // Copy pixel data from one PixelBuffer location to another
     void copyRect(const Rect &dest, const Point& move_by_delta);
 
-    // Copy pixel data to the buffer through a mask
-    //   pixels is a pointer to the pixel to be copied to r.tl.
-    //   maskPos specifies the pixel offset in the mask to start from.
-    //   mask_ is a pointer to the mask bits at (0,0).
-    //   pStride and mStride are the strides of the pixel and mask buffers.
-    void maskRect(const Rect& r, const void* pixels, const void* mask_);
-
-    //   pixel is the Pixel value to be used where mask_ is set
-    void maskRect(const Rect& r, Pixel pixel, const void* mask_);
-
     // Render in a specific format
     //   Does the exact same thing as the above methods, but the given
     //   pixel values are defined by the given PixelFormat.

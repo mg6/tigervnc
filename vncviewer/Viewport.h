@@ -22,17 +22,14 @@
 
 #include <map>
 
-namespace rfb { class ModifiablePixelBuffer; }
-
 #include <FL/Fl_Widget.H>
 
 class Fl_Menu_Button;
 class Fl_RGB_Image;
 
-namespace rfb { class PixelTransformer; }
-
 class CConn;
 class PlatformPixelBuffer;
+class Surface;
 
 class Viewport : public Fl_Widget {
 public:
@@ -48,7 +45,9 @@ public:
 
   // New image for the locally rendered cursor
   void setCursor(int width, int height, const rfb::Point& hotspot,
-                 void* data, void* mask);
+                 const rdr::U8* data);
+
+  void draw(Surface* dst);
 
   // Fl_Widget callback methods
 
@@ -59,8 +58,6 @@ public:
   int handle(int event);
 
 private:
-
-  PlatformPixelBuffer* createFramebuffer(int w, int h);
 
   static void handleClipboardChange(int source, void *data);
 

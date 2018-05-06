@@ -38,7 +38,9 @@
 #include "vncExtInit.h"
 #include "vncHooks.h"
 #include "vncBlockHandler.h"
+#include "vncSelection.h"
 #include "XorgGlue.h"
+#include "xorg-version.h"
 
 using namespace rfb;
 
@@ -83,7 +85,12 @@ rfb::BoolParameter avoidShiftNumLock("AvoidShiftNumLock",
                                      true);
 rfb::StringParameter allowOverride("AllowOverride",
                                    "Comma separated list of parameters that can be modified using VNC extension.",
-                                   "desktop,AcceptPointerEvents,SendCutText,AcceptCutText");
+                                   "desktop,AcceptPointerEvents,SendCutText,AcceptCutText,SendPrimary,SetPrimary");
+rfb::BoolParameter setPrimary("SetPrimary", "Set the PRIMARY as well "
+                              "as the CLIPBOARD selection", true);
+rfb::BoolParameter sendPrimary("SendPrimary",
+                               "Send the PRIMARY as well as the CLIPBOARD selection",
+                               true);
 
 static PixelFormat vncGetPixelFormat(int scrIdx)
 {
@@ -150,6 +157,8 @@ void vncExtensionInit(void)
   ret = vncAddExtension();
   if (ret == -1)
     return;
+
+  vncSelectionInit();
 
   vlog.info("VNC extension running!");
 
@@ -241,37 +250,31 @@ int vncExtensionIsActive(int scrIdx)
   return (desktop[scrIdx] != NULL);
 }
 
-void vncCallReadBlockHandlers(fd_set * fds, struct timeval ** timeout)
+void vncHandleSocketEvent(int fd, int scrIdx, int read, int write)
 {
-  for (int scr = 0; scr < vncGetScreenCount(); scr++)
-    if (desktop[scr])
-      desktop[scr]->readBlockHandler(fds, timeout);
+  desktop[scrIdx]->handleSocketEvent(fd, read, write);
 }
 
-void vncCallReadWakeupHandlers(fd_set * fds, int nfds)
+void vncCallBlockHandlers(int* timeout)
 {
   for (int scr = 0; scr < vncGetScreenCount(); scr++)
     if (desktop[scr])
-      desktop[scr]->readWakeupHandler(fds, nfds);
-}
-
-void vncCallWriteBlockHandlers(fd_set * fds, struct timeval ** timeout)
-{
-  for (int scr = 0; scr < vncGetScreenCount(); scr++)
-    if (desktop[scr])
-      desktop[scr]->writeBlockHandler(fds, timeout);
-}
-
-void vncCallWriteWakeupHandlers(fd_set * fds, int nfds)
-{
-  for (int scr = 0; scr < vncGetScreenCount(); scr++)
-    if (desktop[scr])
-      desktop[scr]->writeWakeupHandler(fds, nfds);
+      desktop[scr]->blockHandler(timeout);
 }
 
 int vncGetAvoidShiftNumLock(void)
 {
   return (bool)avoidShiftNumLock;
+}
+
+int vncGetSetPrimary(void)
+{
+  return (bool)setPrimary;
+}
+
+int vncGetSendPrimary(void)
+{
+  return (bool)sendPrimary;
 }
 
 void vncUpdateDesktopName(void)
@@ -376,10 +379,14 @@ void vncAddCopied(int scrIdx, const struct UpdateRect *extents,
   desktop[scrIdx]->add_copied(reg, rfb::Point(dx, dy));
 }
 
-void vncSetCursor(int scrIdx, int width, int height, int hotX, int hotY,
+void vncSetCursor(int width, int height, int hotX, int hotY,
                   const unsigned char *rgbaData)
 {
-  desktop[scrIdx]->setCursor(width, height, hotX, hotY, rgbaData);
+  for (int scr = 0; scr < vncGetScreenCount(); scr++) {
+    if (desktop[scr] == NULL)
+      continue;
+    desktop[scr]->setCursor(width, height, hotX, hotY, rgbaData);
+  }
 }
 
 void vncPreScreenResize(int scrIdx)
