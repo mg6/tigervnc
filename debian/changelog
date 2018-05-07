@@ -8,7 +8,7 @@ tigervnc (1.8.0+dfsg-1~RC1) UNRELEASED; urgency=high
     /usr/share/xserver-xorg/configure_flags.mk is fucked up in buster and
     ${xxx} is not escaped correctly. We now work around this problem
     and now again use consistent configure flags to build Xtigervnc.
-  * Fresh upstream TigerVNC 1.8 (Closes: #877780).
+  * Fresh upstream TigerVNC 1.8 (Closes: #877780 and Closes: #873151).
 
   [ Philipp Wolski ]
   * Added rfbport to supported commandline arguments for
