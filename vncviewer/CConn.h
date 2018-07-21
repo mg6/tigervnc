@@ -40,7 +40,7 @@ public:
 
   const char *connectionInfo();
 
-  unsigned getFrameCount();
+  unsigned getUpdateCount();
   unsigned getPixelCount();
   unsigned getPosition();
 
@@ -74,6 +74,8 @@ public:
 
   void fence(rdr::U32 flags, unsigned len, const char data[]);
 
+  void setLEDState(unsigned int state);
+
 private:
 
   void resizeFramebuffer();
@@ -93,7 +95,7 @@ private:
 
   DesktopWindow *desktop;
 
-  unsigned frameCount;
+  unsigned updateCount;
   unsigned pixelCount;
 
   rfb::PixelFormat serverPF;

@@ -24,6 +24,7 @@ import java.awt.image.*;
 import java.nio.*;
 
 import com.tigervnc.rfb.*;
+import com.tigervnc.rfb.Point;
 
 public class JavaPixelBuffer extends PlatformPixelBuffer 
 {
@@ -31,23 +32,56 @@ public class JavaPixelBuffer extends PlatformPixelBuffer
   public JavaPixelBuffer(int w, int h) {
     super(getPreferredPF(), w, h,
           getPreferredPF().getColorModel().createCompatibleWritableRaster(w,h));
-    image = new BufferedImage(getPreferredPF().getColorModel(),
-                              getBufferRW(new Rect(0, 0, w, h)), true, null);
+    ColorModel cm = format.getColorModel();
+    image = new BufferedImage(cm, data, cm.isAlphaPremultiplied(), null);
     image.setAccelerationPriority(1);
   }
 
-  public synchronized void fillRect(Rect r, byte[] pix)
+  public WritableRaster getBufferRW(Rect r)
+  {
+    synchronized(image) {
+      return ((BufferedImage)image)
+        .getSubimage(r.tl.x, r.tl.y, r.width(), r.height()).getRaster();
+    }
+  }
+
+  public Raster getBuffer(Rect r)
+  {
+    Rectangle rect =
+      new Rectangle(r.tl.x, r.tl.y, r.width(), r.height());
+    synchronized(image) {
+      return ((BufferedImage)image).getData(rect);
+    }
+  }
+
+  public void fillRect(Rect r, byte[] pix)
   {
     ColorModel cm = format.getColorModel();
     int pixel =
       ByteBuffer.wrap(pix).order(format.getByteOrder()).asIntBuffer().get(0);
     Color c = new Color(cm.getRGB(pixel));
-    Graphics2D g2 = ((BufferedImage)image).createGraphics();
-    g2.setColor(c);
-    g2.fillRect(r.tl.x, r.tl.y, r.width(), r.height());
-    g2.dispose();
+    synchronized(image) {
+      Graphics2D g2 = (Graphics2D)image.getGraphics();
+      g2.setColor(c);
+      g2.fillRect(r.tl.x, r.tl.y, r.width(), r.height());
+      g2.dispose();
+    }
 
     commitBufferRW(r);
+  }
+
+  public void copyRect(Rect rect, Point move_by_delta)
+  {
+    synchronized(image) {
+      Graphics2D g2 = (Graphics2D)image.getGraphics();
+      g2.copyArea(rect.tl.x - move_by_delta.x,
+                  rect.tl.y - move_by_delta.y,
+                  rect.width(), rect.height(),
+                  move_by_delta.x, move_by_delta.y);
+      g2.dispose();
+    }
+
+    commitBufferRW(rect);
   }
 
   private static PixelFormat getPreferredPF()

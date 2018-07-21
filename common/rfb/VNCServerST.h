@@ -28,19 +28,18 @@
 
 #include <rfb/SDesktop.h>
 #include <rfb/VNCServer.h>
-#include <rfb/Configuration.h>
 #include <rfb/LogWriter.h>
 #include <rfb/Blacklist.h>
 #include <rfb/Cursor.h>
 #include <rfb/Timer.h>
 #include <network/Socket.h>
-#include <rfb/ListConnInfo.h>
 #include <rfb/ScreenSet.h>
 
 namespace rfb {
 
   class VNCSConnectionST;
   class ComparingUpdateTracker;
+  class ListConnInfo;
   class PixelBuffer;
   class KeyRemapper;
 
@@ -101,6 +100,7 @@ namespace rfb {
     virtual void setCursor(int width, int height, const Point& hotspot,
                            const rdr::U8* data);
     virtual void setCursorPos(const Point& p);
+    virtual void setLEDState(unsigned state);
 
     virtual void bell();
 
@@ -118,10 +118,6 @@ namespace rfb {
     // the Socket is not recognised then null is returned.
 
     SConnection* getSConnection(network::Socket* sock);
-
-    // getDesktopSize() returns the size of the SDesktop exported by this
-    // server.
-    Point getDesktopSize() const {return desktop->getFbSize();}
 
     // getName() returns the name of this VNC Server.  NB: The value returned
     // is the server's internal buffer which may change after any other methods
@@ -199,6 +195,7 @@ namespace rfb {
     // - Internal methods
 
     void startDesktop();
+    void stopDesktop();
 
     static LogWriter connectionsLog;
     Blacklist blacklist;
@@ -209,6 +206,7 @@ namespace rfb {
     int blockCounter;
     PixelBuffer* pb;
     ScreenSet screenLayout;
+    unsigned int ledState;
 
     CharArray name;
 
@@ -229,8 +227,9 @@ namespace rfb {
     bool needRenderedCursor();
     void startFrameClock();
     void stopFrameClock();
+    int msToNextUpdate();
     void writeUpdate();
-    bool checkUpdate();
+    Region getPendingRegion();
     const RenderedCursor* getRenderedCursor();
 
     void notifyScreenLayoutChange(VNCSConnectionST *requester);

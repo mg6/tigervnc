@@ -65,7 +65,7 @@ public class VncViewer extends javax.swing.JApplet
   public static final String aboutText =
     new String("TigerVNC Java Viewer v%s (%s)%n"+
                "Built on %s at %s%n"+
-               "Copyright (C) 1999-2017 TigerVNC Team and many others (see README.txt)%n"+
+               "Copyright (C) 1999-2018 TigerVNC Team and many others (see README.rst)%n"+
                "See http://www.tigervnc.org for information on TigerVNC.");
 
   public static String version = null;
@@ -81,7 +81,7 @@ public class VncViewer extends javax.swing.JApplet
   public static final InputStream timestamp =
     VncViewer.class.getResourceAsStream("timestamp");
   public static final String os = 
-    System.getProperty("os.name").toLowerCase();
+    System.getProperty("os.name").toLowerCase(Locale.ENGLISH);
   private static VncViewer applet;
 
   private String defaultServerName;
@@ -173,7 +173,8 @@ public class VncViewer extends javax.swing.JApplet
     }
 
     // Override defaults with command-line options
-    for (int i = 0; i < argv.length; i++) {
+    int i = 0;
+    for (; i < argv.length; i++) {
       if (argv[i].length() == 0)
         continue;
 
@@ -191,9 +192,6 @@ public class VncViewer extends javax.swing.JApplet
         continue;
       }
 
-      if (Configuration.setParam(argv[i]))
-        continue;
-
       if (argv[i].charAt(0) == '-') {
         if (i+1 < argv.length) {
           if (Configuration.setParam(argv[i].substring(1), argv[i+1])) {
@@ -201,12 +199,17 @@ public class VncViewer extends javax.swing.JApplet
             continue;
           }
         }
+        if (Configuration.setParam(argv[i]))
+          continue;
+
         usage();
       }
 
       vncServerName.put(argv[i].toCharArray()).flip();
     }
 
+    // Check if the server name in reality is a configuration file
+    potentiallyLoadConfigurationFile(vncServerName);
   }
 
   public static void usage() {
@@ -214,6 +217,7 @@ public class VncViewer extends javax.swing.JApplet
                     "[host:displayNum]\n"+
                     "       vncviewer [options/parameters] -listen [port] "+
                     "[options/parameters]\n"+
+                    "       vncviewer [options/parameters] [.tigervnc file]\n"+
                     "\n"+
                     "Options:\n"+
                     "  -log <level>    configure logging level\n"+
@@ -274,6 +278,27 @@ public class VncViewer extends javax.swing.JApplet
     // Technically, we shouldn't use System.exit here but if there is a parameter
     // error then the problem is in the index/html file anyway.
     System.exit(1);
+  }
+
+  public static void potentiallyLoadConfigurationFile(CharBuffer vncServerName) {
+    String serverName = vncServerName.toString();
+    boolean hasPathSeparator = (serverName.indexOf('/') != -1 ||
+                                (serverName.indexOf('\\')) != -1);
+
+    if (hasPathSeparator) {
+      try {
+        serverName = loadViewerParameters(vncServerName.toString());
+        if (serverName == "") {
+          vlog.info("Unable to load the server name from given file");
+          System.exit(1);
+        }
+        vncServerName.clear();
+        vncServerName.put(serverName).flip();
+      } catch (com.tigervnc.rfb.Exception e) {
+        vlog.info(e.getMessage());
+        System.exit(1);
+      }
+    }
   }
 
   public static void newViewer() {
@@ -393,7 +418,7 @@ public class VncViewer extends javax.swing.JApplet
       }
       public void windowDeactivated(WindowEvent e) {
         if (cc != null)
-          cc.releaseDownKeys();
+          cc.desktop.viewport.releaseDownKeys();
       }
     });
   }
@@ -411,7 +436,7 @@ public class VncViewer extends javax.swing.JApplet
     }
   }
 
-  public static void showAbout(Container parent) {
+  public static void about_vncviewer(Container parent) {
     String pkgDate = "";
     String pkgTime = "";
     try {
@@ -440,8 +465,7 @@ public class VncViewer extends javax.swing.JApplet
   }
 
   public void start() {
-    thread = new Thread(this);
-    thread.start();
+    (new Thread(this, "VncViewer Thread")).start();
   }
 
   public void exit(int n) {
@@ -486,6 +510,9 @@ public class VncViewer extends javax.swing.JApplet
 
   public void run() {
     cc = null;
+    UserDialog dlg = new UserDialog();
+    CSecurity.upg = dlg;
+    CSecurityTLS.msg = dlg;
     Socket sock = null;
 
     /* Specifying -via and -listen together is nonsense */
@@ -555,6 +582,5 @@ public class VncViewer extends javax.swing.JApplet
   = new StringParameter("Config",
   "Specifies a configuration file to load.", null);
 
-  Thread thread;
   static LogWriter vlog = new LogWriter("VncViewer");
 }
