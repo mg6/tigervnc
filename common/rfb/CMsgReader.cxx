@@ -109,6 +109,11 @@ void CMsgReader::readMsg()
     case pseudoEncodingExtendedDesktopSize:
       readExtendedDesktopSize(x, y, w, h);
       break;
+    case pseudoEncodingLEDState:
+      readLEDState();
+    case pseudoEncodingQEMUKeyEvent:
+      handler->supportsQEMUKeyEvent();
+      break;
     default:
       readRect(Rect(x, y, x+w, y+h), encoding);
       break;
@@ -216,7 +221,7 @@ void CMsgReader::readSetXCursor(int width, int height, const Point& hotspot)
   rdr::U8 buf[width*height*4];
   rdr::U8* out;
 
-  if (width * height) {
+  if (width * height > 0) {
     pr = is->readU8();
     pg = is->readU8();
     pb = is->readU8();
@@ -335,7 +340,6 @@ void CMsgReader::readSetCursorWithAlpha(int width, int height, const Point& hots
     buf[0] = (unsigned)buf[0] * 255/alpha;
     buf[1] = (unsigned)buf[1] * 255/alpha;
     buf[2] = (unsigned)buf[2] * 255/alpha;
-    buf[3] = alpha;
 
     buf += 4;
   }
@@ -381,4 +385,13 @@ void CMsgReader::readExtendedDesktopSize(int x, int y, int w, int h)
   }
 
   handler->setExtendedDesktopSize(x, y, w, h, layout);
+}
+
+void CMsgReader::readLEDState()
+{
+  rdr::U8 state;
+
+  state = is->readU8();
+
+  handler->setLEDState(state);
 }

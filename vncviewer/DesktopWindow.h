@@ -62,9 +62,15 @@ public:
   // Resize the current framebuffer, but retain the contents
   void resizeFramebuffer(int new_w, int new_h);
 
+  // Incoming clipboard from server
+  void serverCutText(const char* str, rdr::U32 len);
+
   // New image for the locally rendered cursor
   void setCursor(int width, int height, const rfb::Point& hotspot,
                  const rdr::U8* data);
+
+  // Change client LED state
+  void setLEDState(unsigned int state);
 
   // Fl_Window callback methods
   void draw();
@@ -84,6 +90,8 @@ private:
 
   void grabKeyboard();
   void ungrabKeyboard();
+  void grabPointer();
+  void ungrabPointer();
 
   static void handleGrab(void *data);
 
@@ -120,15 +128,18 @@ private:
   bool delayedFullscreen;
   bool delayedDesktopSize;
 
+  bool keyboardGrabbed;
+  bool mouseGrabbed;
+
   struct statsEntry {
-    unsigned fps;
+    unsigned ups;
     unsigned pps;
     unsigned bps;
   };
   struct statsEntry stats[100];
 
   struct timeval statsLastTime;
-  unsigned statsLastFrame;
+  unsigned statsLastUpdates;
   unsigned statsLastPixels;
   unsigned statsLastPosition;
 

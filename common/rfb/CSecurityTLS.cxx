@@ -153,7 +153,7 @@ bool CSecurityTLS::processMsg(CConnection* cc)
       if (result == secResultFailed || result == secResultTooMany)
         reason.buf = is->readString();
       else
-        reason.buf = strDup("Authentication failure (protocol error)");
+        reason.buf = strDup("protocol error");
       throw AuthFailureException(reason.buf);
     }
 
@@ -254,6 +254,11 @@ void CSecurityTLS::setParam()
     if (gnutls_credentials_set(session, GNUTLS_CRD_CERTIFICATE, cert_cred) != GNUTLS_E_SUCCESS)
       throw AuthFailureException("gnutls_credentials_set failed");
 
+    if (gnutls_server_name_set(session, GNUTLS_NAME_DNS,
+                               client->getServerName(),
+                               strlen(client->getServerName())) != GNUTLS_E_SUCCESS)
+      vlog.error("Failed to configure the server name for TLS handshake");
+
     vlog.debug("X509 session has been set");
   }
 }
@@ -331,6 +336,9 @@ void CSecurityTLS::checkSession()
     vlog.debug("server cert signer not found");
   if (status & GNUTLS_CERT_SIGNER_NOT_CA)
     vlog.debug("server cert signer not CA");
+
+  if (status & GNUTLS_CERT_INSECURE_ALGORITHM)
+    throw AuthFailureException("The server certificate uses an insecure algorithm");
 
   if ((status & (~allowed_errors)) != 0) {
     /* No other errors are allowed */
