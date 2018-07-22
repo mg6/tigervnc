@@ -2,7 +2,7 @@ Index: pkg-tigervnc/CMakeLists.txt
 ===================================================================
 --- pkg-tigervnc.orig/CMakeLists.txt
 +++ pkg-tigervnc/CMakeLists.txt
-@@ -242,12 +242,19 @@ if(UNIX AND NOT APPLE)
+@@ -245,12 +245,19 @@ if(UNIX AND NOT APPLE)
    if(X11_Xinerama_FOUND)
      set(FLTK_LIBRARIES ${FLTK_LIBRARIES} ${X11_Xinerama_LIB})
    endif()

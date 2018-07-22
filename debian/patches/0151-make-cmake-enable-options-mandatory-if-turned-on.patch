@@ -2,7 +2,7 @@ Index: pkg-tigervnc/CMakeLists.txt
 ===================================================================
 --- pkg-tigervnc.orig/CMakeLists.txt
 +++ pkg-tigervnc/CMakeLists.txt
-@@ -135,8 +135,8 @@ endif()
+@@ -138,8 +138,8 @@ endif()
  find_package(ZLIB REQUIRED)
  
  # Check for gettext
@@ -13,7 +13,7 @@ Index: pkg-tigervnc/CMakeLists.txt
    # Tools
    find_package(Gettext)
  
-@@ -170,8 +170,14 @@ if(ENABLE_NLS)
+@@ -173,8 +173,14 @@ if(ENABLE_NLS)
    endif()
  
    if(NOT GETTEXT_FOUND OR NOT ICONV_FOUND)
@@ -30,7 +30,7 @@ Index: pkg-tigervnc/CMakeLists.txt
    endif()
  endif()
  
-@@ -247,13 +253,19 @@ if(UNIX AND NOT APPLE)
+@@ -250,13 +256,19 @@ if(UNIX AND NOT APPLE)
  endif()
  
  # Check for GNUTLS library
@@ -52,7 +52,7 @@ Index: pkg-tigervnc/CMakeLists.txt
    endif()
  endif()
  
-@@ -267,7 +279,12 @@ if(ENABLE_PAM)
+@@ -270,7 +282,12 @@ if(ENABLE_PAM)
    if(HAVE_PAM_H AND HAVE_PAM_START)
      set(PAM_LIBS pam)
    else()

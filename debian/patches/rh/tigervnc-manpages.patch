@@ -14,9 +14,9 @@ Index: pkg-tigervnc/vncviewer/vncviewer.cxx
 ===================================================================
 --- pkg-tigervnc.orig/vncviewer/vncviewer.cxx
 +++ pkg-tigervnc/vncviewer/vncviewer.cxx
-@@ -352,6 +352,11 @@ static void usage(const char *programNam
-           "       %s [parameters] -listen [port] [parameters]\n",
-           programName, programName);
+@@ -353,6 +353,11 @@ static void usage(const char *programNam
+           "       %s [parameters] [.tigervnc file]\n",
+           programName, programName, programName);
    fprintf(stderr,"\n"
 +	  "Options:\n\n"
 +	  "  -display Xdisplay - Specifies the X display for the viewer window\n"

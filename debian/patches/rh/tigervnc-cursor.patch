@@ -2,7 +2,7 @@ Index: pkg-tigervnc/vncviewer/Viewport.cxx
 ===================================================================
 --- pkg-tigervnc.orig/vncviewer/Viewport.cxx
 +++ pkg-tigervnc/vncviewer/Viewport.cxx
-@@ -213,7 +213,7 @@ void Viewport::setCursor(int width, int
+@@ -313,7 +313,7 @@ void Viewport::setCursor(int width, int
      }
    }
  
