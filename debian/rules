@@ -34,8 +34,7 @@ DEB_DH_AUTORECONF_CLEAN_ARGS =
 
 #include /usr/share/cdbs/1/rules/autoreconf.mk we need the deautoreconf in the unpatch sequence
 
-# --disable-maintainer-mode does not seem to do its job! Why?!
-DEB_CONFIGURE_EXTRA_FLAGS += --disable-maintainer-mode
+DEB_CONFIGURE_EXTRA_FLAGS +=
 
 DEB_CMAKE_INSTALL_PREFIX  = /usr
 DEB_CMAKE_EXTRA_FLAGS     += -DUSE_INCLUDED_ZLIB:BOOL=OFF
@@ -199,7 +198,6 @@ XORG_DEBIAN_CONFIGURE_FLAGS = \
 		--build=% \
 		--host=% \
 		--enable-xwayland \
-		--enable-xfbdev \
 		--enable-dmx \
 		--enable-xvfb \
 		--enable-xnest \
@@ -207,6 +205,7 @@ XORG_DEBIAN_CONFIGURE_FLAGS = \
 		--enable-xorg \
 		--enable-dri \
 		--enable-dri2 \
+		--enable-dri3 \
 		--enable-xmir \
 	    , $(xserver_confflags) \
 	)
@@ -214,10 +213,11 @@ XORG_DEBIAN_CONFIGURE_FLAGS = \
 # Next step is run configure script. It is very difficult use correct parameters.
 # You should use same parameters as used in your distribution X server and add
 # --disable-xvfb --disable-xnest --disable-xorg
-$(DEB_BUILDDIR)/unix/xserver/configure.stamp: apply-patches-vnc-patch-xorg-libtool
+$(DEB_BUILDDIR)/unix/xserver/configure.stamp: $(DEB_SRCDIR)/unix/xserver/.apply-patches-vnc-patch-xorg-libtool.stamp
 	mkdir -p $(DEB_BUILDDIR)/unix/xserver
-	cd $(DEB_BUILDDIR)/unix/xserver && \
+	( cd $(DEB_BUILDDIR)/unix/xserver && \
 	  $(DEB_CONFIGURE_SCRIPT_ENV) $(CURDIR)/$(DEB_SRCDIR)/unix/xserver/configure \
+		TIGERVNC_BUILDDIR="$(CURDIR)/$(DEB_BUILDDIR)" \
 		CPPFLAGS="$(CPPFLAGS)" \
 		CFLAGS="$(CFLAGS)" \
 		CXXFLAGS="$(CXXFLAGS)" \
@@ -232,18 +232,18 @@ $(DEB_BUILDDIR)/unix/xserver/configure.stamp: apply-patches-vnc-patch-xorg-libto
 		--disable-selective-werror \
 		--with-builderstring="tigervnc-xorg-server $(NO_EPOCH_VER) (TigerVNC Packaging Team <pkg-tigervnc-devel@lists.alioth.debian.org>)" \
 		--disable-xwayland \
-		--disable-xfbdev \
 		--disable-dmx \
 		--disable-xvfb \
 		--disable-xnest \
 		--disable-xephyr \
 		--disable-xorg \
 		--disable-dri \
-		--disable-dri2
-	touch $@
+		--disable-dri2 \
+		--disable-dri3 ) && \
+	  touch $@
 
 build/tigervnc-standalone-server build/tigervnc-xorg-extension::
-	$(MAKE) -C $(DEB_BUILDDIR)/unix/xserver
+	$(MAKE) TIGERVNC_BUILDDIR="$(CURDIR)/$(DEB_BUILDDIR)" -C $(DEB_BUILDDIR)/unix/xserver
 
 install/tigervnc-common::
 	mkdir -p $(DEB_DESTDIR)/usr/share/doc
@@ -257,7 +257,7 @@ install/tigervnc-viewer::
 	  $(DEB_DESTDIR)/usr/share/man/man1/xvncviewer.1
 
 install/tigervnc-standalone-server install/tigervnc-xorg-extension::
-	$(MAKE) -C $(DEB_BUILDDIR)/unix/xserver/hw/vnc DESTDIR=$(DEB_DESTDIR) install
+	$(MAKE) TIGERVNC_BUILDDIR="$(CURDIR)/$(DEB_BUILDDIR)" -C $(DEB_BUILDDIR)/unix/xserver/hw/vnc DESTDIR=$(DEB_DESTDIR) install
 
 common-binary-arch:: debian/tmp/common-binary-impl.stamp
 
