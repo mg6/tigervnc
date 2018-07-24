@@ -1,4 +1,4 @@
-tigervnc (1.9.0+dfsg-1~RC1) UNRELEASED; urgency=high
+tigervnc (1.9.0+dfsg-1~RC2) UNRELEASED; urgency=high
 
   [ Joachim Falk ]
   * Fixed typo in tigervncserver wrapper script (Closes: #881276).

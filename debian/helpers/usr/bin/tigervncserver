@@ -72,6 +72,7 @@ use warnings;
 use File::Path;
 use File::Spec;
 use File::Basename qw(dirname basename);
+use File::ReadBackwards;
 use DirHandle;
 use File::stat;
 use IO::File;
@@ -499,12 +500,26 @@ sub runningUserVncservers {
       my $DISPLAY = -e "/tmp/.X11-unix/X${usedDisplay}"
         ? ":${usedDisplay}"
 	: "$HOSTFQDN:${usedDisplay}";
+      my $rfbport     = 5900 + $usedDisplay;
+      my $logFile     = desktopLog($options, $usedDisplay);
+      my $logFileFh   = File::ReadBackwards->new($logFile);
+
+      if (defined $logFileFh) {
+        my $line;
+        while (defined ($line = $logFileFh->readline)) {
+          chomp $line;
+          if ($line =~ m/Listening for VNC connections.* port\s+(\d+)/) {
+            $rfbport = $1; last;
+          }
+        }
+      }
       # running vnc if !$options->{'cleanstale'}
       $runningUserVncservers{$usedDisplay} = {
           'name'        => "$HOSTFQDN:$usedDisplay",
           'pid'         => $pid,
           'DISPLAY'     => $DISPLAY,
           'usedDisplay' => $usedDisplay,
+          'rfbport'     => $rfbport,
           'stale'       => $stale,
         };
     }
@@ -576,13 +591,14 @@ sub listXvncServer {
     "\n".
     "TigerVNC server sessions:\n".
     "\n".
-    "X DISPLAY #\tPROCESS ID\n";
+    "X DISPLAY #\tRFB PORT #\tPROCESS ID\n";
   foreach my $vnc (@{$vncs}) {
     next unless defined $runningUserVncservers->{$vnc};
-    my $stale = "";
-    $stale = " (stale)" if $runningUserVncservers->{$vnc}->{'stale'};
+    my $stale = $runningUserVncservers->{$vnc}->{'stale'}
+      ? " (stale)" : "";
+    my $rfbport = $runningUserVncservers->{$vnc}->{'rfbport'};
     my $pid = $runningUserVncservers->{$vnc}->{'pid'};
-    print $fh ":".$vnc."\t\t".$pid.$stale."\n";
+    print $fh ":".$vnc."\t\t".$rfbport."\t\t".$pid.$stale."\n";
   }
 }
 
@@ -1430,8 +1446,8 @@ SCRIPTEOF
     my $haveOld =
       $runningUserVncservers->{$options->{'displayNumber'}} &&
       !$runningUserVncservers->{$options->{'displayNumber'}}->{'stale'};
-    if (!&checkDisplayNumberAvailable($options->{'displayNumber'}) &&
-        !($options->{'useold'} && $haveOld)) {
+    if (!($options->{'useold'} && $haveOld) &&
+        !&checkDisplayNumberAvailable($options->{'displayNumber'})) {
       print STDERR "A VNC/X11 server is already running as :$options->{'displayNumber'} on machine $HOSTFQDN\n";
       exit 1;
     }
@@ -1440,7 +1456,16 @@ SCRIPTEOF
     }
     if ($options->{'useold'} && $haveOld) {
       my $DISPLAY = $runningUserVncservers->{$options->{'displayNumber'}}->{'DISPLAY'};
-      print "\nUsing old '$options->{'desktopName'}' desktop at $DISPLAY on machine $HOSTFQDN\n\n";
+      print "\nReusing old '$options->{'desktopName'}' desktop at $DISPLAY on machine $HOSTFQDN.\n";
+      my $rfbport = $runningUserVncservers->{$options->{'displayNumber'}}->{'rfbport'};
+      if ($rfbport != $options->{'displayNumber'} + 5900) {
+        my @cmd = ("xtigervncviewer");
+        my $connection = ($rfbport >= 5900 && $rfbport <= 5999)
+          ? ":".$rfbport-5900 : ":".$rfbport;
+        push @cmd, $connection;
+        print "Use ".join(" ", @cmd)." to connect to the VNC server.\n";
+      }
+      print "\n";
     } else {
       if ($runningUserVncservers->{$options->{'displayNumber'}} &&
           $runningUserVncservers->{$options->{'displayNumber'}}->{'stale'}) {
