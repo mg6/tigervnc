@@ -1,4 +1,4 @@
-tigervnc (1.9.0+dfsg-2~RC1) UNRELEASED; urgency=medium
+tigervnc (1.9.0+dfsg-2~RC3) UNRELEASED; urgency=medium
 
   [ Christoph Biedl ]
   * Add missing dependency on libunwind-dev. Closes: #911712
