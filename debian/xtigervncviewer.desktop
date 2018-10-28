@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=TigerVNC Viewer
+Exec=/usr/bin/xtigervncviewer
+Icon=tigervnc
+Terminal=false
+Type=Application
+Categories=Network;

@@ -1,1 +1,8 @@
 usr/bin/xtigervncviewer usr/bin
+debian/xtigervncviewer.desktop /usr/share/applications
+media/icons/tigervnc.svg    /usr/share/icons/hicolor/scalable/apps
+media/icons/tigervnc_16.png /usr/share/icons/hicolor/16x16/apps
+media/icons/tigervnc_22.png /usr/share/icons/hicolor/22x22/apps
+media/icons/tigervnc_24.png /usr/share/icons/hicolor/24x24/apps
+media/icons/tigervnc_32.png /usr/share/icons/hicolor/32x32/apps
+media/icons/tigervnc_48.png /usr/share/icons/hicolor/48x48/apps
