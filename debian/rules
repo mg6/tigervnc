@@ -256,6 +256,17 @@ install/tigervnc-viewer::
 	  $(DEB_DESTDIR)/usr/bin/xvncviewer
 	mv $(DEB_DESTDIR)/usr/share/man/man1/vncviewer.1 \
 	  $(DEB_DESTDIR)/usr/share/man/man1/xvncviewer.1
+	mkdir -p $(DEB_DESTDIR)/usr/share/applications
+	cp debian/xtigervncviewer.desktop \
+	  $(DEB_DESTDIR)/usr/share/applications/
+	mkdir -p $(DEB_DESTDIR)/usr/share/icons/hicolor/scalable/apps
+	cp media/icons/tigervnc.svg \
+	  $(DEB_DESTDIR)/usr/share/icons/hicolor/scalable/apps/
+	for i in 16 22 24 32 48; do \
+	  mkdir -p $(DEB_DESTDIR)/usr/share/icons/hicolor/$${i}x$${i}/apps; \
+	  cp media/icons/tigervnc_$${i}.png \
+	    $(DEB_DESTDIR)/usr/share/icons/hicolor/$${i}x$${i}/apps/tigervnc.png; \
+	done
 
 install/tigervnc-standalone-server install/tigervnc-xorg-extension::
 	$(MAKE) TIGERVNC_BUILDDIR="$(CURDIR)/$(DEB_BUILDDIR)" -C $(DEB_BUILDDIR)/unix/xserver/hw/vnc DESTDIR=$(DEB_DESTDIR) install
