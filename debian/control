@@ -23,6 +23,7 @@ Build-Depends:
  libjpeg-dev,
  libgnutls28-dev,
  libpam0g-dev,
+ libunwind-dev,
  libxft-dev,
  libxcursor-dev,
  libwrap0-dev,
