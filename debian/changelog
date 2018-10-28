@@ -1,3 +1,13 @@
+tigervnc (1.9.0+dfsg-2~RC1) UNRELEASED; urgency=medium
+
+  [ Christoph Biedl ]
+  * Add missing dependency on libunwind-dev. Closes: #911712
+
+  [ Joachim Falk ]
+  * Add missing .desktop file and icons for xtigervncviewer. Closes: #905905
+
+ -- Joachim Falk <joachim.falk@gmx.de>  Sun, 28 Oct 2018 21:26:06 +0100
+
 tigervnc (1.9.0+dfsg-1) unstable; urgency=high
 
   [ Joachim Falk ]
