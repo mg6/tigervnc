@@ -1,12 +1,16 @@
-tigervnc (1.9.0+dfsg-2~RC3) UNRELEASED; urgency=medium
+tigervnc (1.9.0+dfsg-2) unstable; urgency=medium
 
   [ Christoph Biedl ]
-  * Add missing dependency on libunwind-dev. Closes: #911712
+  * Add missing dependency on libunwind-dev. (Closes: #911712).
 
   [ Joachim Falk ]
-  * Add missing .desktop file and icons for xtigervncviewer. Closes: #905905
+  * Add missing .desktop file and icons for xtigervncviewer. (Closes: #905905).
 
- -- Joachim Falk <joachim.falk@gmx.de>  Sun, 28 Oct 2018 21:26:06 +0100
+  [ Mike Gabriel ]
+  * debian/*: White-space clean up.
+  * debian/control: Comment out one occursion of dh-autoreconf. Thanks lintian.
+
+ -- Mike Gabriel <sunweaver@debian.org>  Mon, 29 Oct 2018 10:42:06 +0100
 
 tigervnc (1.9.0+dfsg-1) unstable; urgency=high
 
