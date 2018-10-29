@@ -15,7 +15,7 @@ Uploaders:
 # everything on is for the DMX and Xnest servers.
 Build-Depends:
  cdbs (>= 0.4.89),
- dh-autoreconf,
+# dh-autoreconf,
  cmake (>= 2.8),
  pristine-tar,
  gettext,
