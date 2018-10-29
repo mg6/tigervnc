@@ -42,12 +42,12 @@ package config;
 
 sub readConfigFile {
   my ( $ConfigFile ) = @_;
-  
+
   eval { do "$ConfigFile"; };
   if ($@) {
     print STDERR "$PROG: Error parsing config file, $@";
   }
-  
+
 #  my $lineno = 0;
 #  while (<$cf>) {
 #    chomp;
@@ -150,14 +150,14 @@ cmd:
 
 sub readConfigFile {
   my $options = shift;
-  
+
   # Add aliases of ::config to %$options
   foreach my $key (keys %$options) {
     no strict 'refs';
     *{"config::$key"} = \$options->{$key};
   }
   foreach my $ConfigFile (@_) {
-    next unless -f $ConfigFile; 
+    next unless -f $ConfigFile;
     config::readConfigFile( $ConfigFile );
   }
 #  foreach my $key (keys %$options) {
@@ -172,7 +172,7 @@ sub readConfigFile {
 sub readXFConfig {
   my $options = shift;
   my ($XFConfigPath) = @_;
-  
+
   my $cf;
   foreach my $path (split(/:/, $XFConfigPath)) {
     last if defined ($cf = IO::File->new( "<$path" ));
@@ -198,7 +198,7 @@ sub readXFConfig {
   }
   if (defined $fontPath) {
     my @fontPathElements = split(/\s*,\s*/, $fontPath);
-    
+
     $fontPath = '';
     foreach my $tempFontPath (@fontPathElements) {
       # is font directory or fontserver (xfs) ?
@@ -226,10 +226,10 @@ sub readXFConfig {
 
 sub checkGeometryAndDepth {
   my ( $options ) = @_;
-  
+
   my $wmDecorationWidth;
   my $wmDecorationHeight;
-  
+
   if ($options->{'wmDecoration'} =~ /^(\d+)x(\d+)$/) {
     ($wmDecorationWidth, $wmDecorationHeight) = ($1,$2);
   } else {
@@ -246,10 +246,10 @@ sub checkGeometryAndDepth {
       print STDERR "$PROG: geometry $options->{'geometry'} is invalid\n";
       exit 1;
     }
-    
+
     $width  = int(($width +3)/4)*4;
     $height = int(($height+1)/2)*2;
-    
+
     $options->{'geometry'} = "${width}x${height}";
   } else {
     print STDERR "$PROG: geometry $options->{'geometry'} is invalid\n";
@@ -285,9 +285,9 @@ sub checkGeometryAndDepth {
 
 sub getXDisplayDefaults {
   my ( $options ) = @_;
-  
+
   my (@lines, @matchlines, $defaultVisualId, $i);
-  
+
   return if !defined($ENV{DISPLAY}) &&
             !defined($options->{'getDefaultFrom'});
 
@@ -297,16 +297,16 @@ sub getXDisplayDefaults {
   } else {
     @lines = `$xdpyinfo $options->{'getDefaultFrom'} 2>/dev/null`;
   }
-  
+
   return if ($? != 0);
-  
+
   @matchlines = grep(/dimensions/, @lines);
   if (@matchlines) {
     my ($width, $height) = ($matchlines[0] =~ /(\d+)x(\d+) pixels/);
     $options->{'geometry'} = "${width}x${height}";
     $options->{'usedXDisplayDefaultsGeometry'} = 1;
   }
-  
+
   @matchlines = grep(/default visual id/, @lines);
   if (@matchlines) {
     ($defaultVisualId) = ($matchlines[0] =~ /id:\s+(\S+)/);
@@ -353,7 +353,7 @@ sub getXDisplayDefaults {
 sub checkTCPPortUsed {
   my ($port) = @_;
   my $proto  = getprotobyname('tcp');
-  
+
   socket(S, AF_INET, SOCK_STREAM, $proto) || die "$PROG: socket failed: $!";
   setsockopt(S, SOL_SOCKET, SO_REUSEADDR, pack("l", 1)) || die "$PROG: setsockopt failed: $!";
   if (!bind(S, sockaddr_in($port, INADDR_ANY))) {
@@ -412,7 +412,7 @@ sub getDisplayNumber {
   foreach my $n (1..99) {
     return $n if &checkDisplayNumberAvailable($n);
   }
-  
+
   print STDERR "$PROG: no free display number on $HOSTFQDN.\n";
   exit -1;
 }
@@ -451,7 +451,7 @@ sub cleanStale {
   my ($options, $usedDisplay, $stale) = @_;
   my $pidFile  = pidFile($options,$usedDisplay);
   my @x11Locks = ("/tmp/.X$usedDisplay-lock", "/tmp/.X11-unix/X$usedDisplay");
-  
+
   # vnc pidfile stale
   my $msg = "";
   if (-e $pidFile) {
@@ -475,7 +475,7 @@ sub cleanStale {
 sub runningUserVncservers {
   my ($options) = @_;
   my %runningUserVncservers = ();
-  
+
   my $d = DirHandle->new($options->{'vncUserDir'});
   if (defined $d) {
     while (defined(my $entry = $d->read)) {
@@ -534,13 +534,13 @@ sub runningUserVncservers {
 
 sub killXvncServer {
   my ($options, $runningUserVncservers, $vncs) = @_;
-  
+
   $SIG{'CHLD'} = 'IGNORE';
   my $retval = 0;
   foreach my $vnc (@{$vncs}) {
     my $stale = 0;
     my $pid   = $runningUserVncservers->{$vnc}->{'pid'};
-    
+
     next unless defined $pid;
     print "Killing Xtigervnc process ID $pid...";
     unless ($options->{'dry-run'}) {
@@ -570,7 +570,7 @@ sub killXvncServer {
       }
     }
     &cleanStale($options,$vnc,$stale);
-    
+
     # If option -clean is given, also remove the logfile
     if (!$options->{'dry-run'} && $options->{'clean'}) {
       my $desktopLog = &desktopLog($options, $vnc);
@@ -586,7 +586,7 @@ sub killXvncServer {
 
 sub listXvncServer {
   my ($fh, $options, $runningUserVncservers, $vncs) = @_;
-  
+
   print $fh
     "\n".
     "TigerVNC server sessions:\n".
@@ -608,7 +608,7 @@ sub CreateMITCookie {
   my $displayNumber  = $options->{'displayNumber'};
   my $xauthorityFile = $options->{'xauthorityFile'};
   my $cookie = `mcookie`; # try mcookie
-  
+
   unless (defined $cookie) {
     # mcookie failed => make an X server cookie the old fashioned way
     srand(time+$$+unpack("L",`cat $options->{'vncPasswdFile'}`));
@@ -620,7 +620,7 @@ sub CreateMITCookie {
     chomp $cookie;
   }
   system(getCommand("xauth"), "-f", "$xauthorityFile", "add", "$HOSTFQDN:$displayNumber", ".", "$cookie");
-  system(getCommand("xauth"), "-f", "$xauthorityFile", "add", "$HOST/unix:$displayNumber", ".", "$cookie"); 
+  system(getCommand("xauth"), "-f", "$xauthorityFile", "add", "$HOST/unix:$displayNumber", ".", "$cookie");
 }
 
 # Make sure the user has a password.
@@ -633,14 +633,14 @@ sub CreateVNCPasswd {
              $options->{'passwordArgSpecified'};
   my $vncPasswdFile = $options->{'vncPasswdFile'};
   my $st = stat($vncPasswdFile);
-  
+
   if (!defined($st) || ($st->mode & 077)) {
     print "\nYou will require a password to access your desktops.\n\n";
     unless (unlink($vncPasswdFile) || $! == &ENOENT) {
       print STDERR "Can't remove old vnc passwd file '$vncPasswdFile': $!!\n";
       exit 1;
     }
-    system(getCommand("tigervncpasswd"), $vncPasswdFile); 
+    system(getCommand("tigervncpasswd"), $vncPasswdFile);
     exit 1 if (($? >> 8) != 0);
   }
 }
@@ -648,16 +648,16 @@ sub CreateVNCPasswd {
 # Make sure the user has a x509 certificate.
 sub CreateX509Cert {
   my ( $options ) = @_;
-  
+
   # Check whether X509 encryption is enabled, and if so, create
   # a self signed certificate if not already present or specified
   # on the command line.
   return if !$options->{'x509CertRequired'} ||
             defined $options->{'X509Cert'} ||
             defined $options->{'X509Key'};
-  ($options->{'X509Cert'}, $options->{'X509Key'}) = 
+  ($options->{'X509Cert'}, $options->{'X509Key'}) =
     &x509CertFiles($options);
-  
+
   my $st = stat($options->{'X509Key'});
   if (!defined($st) || ($st->mode & 077) || !-f $options->{'X509Cert'}) {
     print "\nYou will require a certificate to use X509None, X509Vnc, or X509Plain.\n";
@@ -708,17 +708,17 @@ sub startXvncServer {
   my $rfbport    = 5900 + $options->{'displayNumber'};
   my $desktopLog = &desktopLog($options);
   my $pidFile    = &pidFile($options);
-  
+
   if ($options->{'rfbport'}) {
     $rfbport = $options->{'rfbport'};
   }
-  
+
   # Make sure the user has a password if required.
   &CreateVNCPasswd($options);
   # Make sure the user has a x509 certificate if required.
   &CreateX509Cert($options);
   &CreateMITCookie($options);
-  
+
   # Create the user's vncStartup script if necessary.
   if (defined($vncStartup) && !$xstartupArg && !(-e $vncStartup)) {
     print "Creating default startup script $vncStartup\n";
@@ -738,7 +738,7 @@ sub startXvncServer {
       exit 1;
     }
   }
-  
+
   my $pidFileFh  = IO::File->new($pidFile, "w", 0644);
   unless (defined $pidFileFh) {
     print STDERR "$PROG: Can't create pid file '$pidFile': $!\n";
@@ -800,7 +800,7 @@ sub startXvncServer {
   }
   $pidFileFh->print($xvncServerPid."\n");
   $pidFileFh->close();
-  
+
   my $runningUserVncservers = {
       $options->{'displayNumber'} => {
           'name'        => "$HOSTFQDN:".$options->{'displayNumber'},
@@ -953,7 +953,7 @@ sub startXvncServer {
 
 sub usage {
   my ($err) = @_;
-  
+
   my $prefix = " " x length("  $PROG ");
   print STDERR "usage:\n".
     "  $PROG -help|-h|-?            This help message. Further help in tigervncserver(1).\n\n".
@@ -1009,7 +1009,7 @@ sub usage {
     "  $PROG -list                  List VNC server sessions\n".
     $prefix."[:<number>|:*]         VNC server to list, * for all\n".
     $prefix."[-cleanstale]          Do not list stale VNC server sessions\n\n";
-    
+
   exit($err ? 1 : 0);
 }
 
@@ -1018,7 +1018,7 @@ sub main {
   # First make sure we're operating in a sane environment.
   #
   &sanityCheck();
-  
+
   # Get the hostname
   {
     my $hostname= getCommand("hostname");
@@ -1097,7 +1097,7 @@ SCRIPTEOF
       displayNumber		=> undef,
       displayHost		=> undef,
     };
-  
+
   #
   # Then source in configuration files, first the site wide one and then the
   # user specific one.
@@ -1108,7 +1108,7 @@ SCRIPTEOF
     &readXFConfig($options, $tmpOpt->{'XFConfigPath'});
   }
   &readConfigFile($options, "/etc/vnc.conf");
-  
+
   if (!(-d $options->{'vncUserDir'})) {
     # Create the user's vnc directory if necessary.
     if (-e $options->{'vncUserDir'}) {
@@ -1152,13 +1152,13 @@ SCRIPTEOF
     print STDERR "VNC class files can not be found at $options->{'vncClasses'}.";
     exit 1;
   }
-  
+
   {
     # seperate session args
     {
       my @newargv;
       my $ref = \@newargv;
-      
+
       foreach my $entry (@ARGV) {
         if ( $entry eq '--' ) {
           $ref = $options->{'sessionArgs'};
@@ -1241,9 +1241,9 @@ SCRIPTEOF
       'I-KNOW-THIS-IS-INSECURE' => \$options->{'I-KNOW-THIS-IS-INSECURE'},
       'rfbport=i'         => \$options->{'rfbport'},
     );
-    
+
     &usage(!$rc) if (!$rc || $opts{'help'});
-    
+
     if ((@ARGV > 0) && ($ARGV[0] =~ /^([@\w\d.]*)(?::(\d+(?:\.\d+)?|\*))?$/)) {
       shift(@ARGV);
       $options->{'localhost'} = 'yes' if $1 eq "localhost";
@@ -1264,7 +1264,7 @@ SCRIPTEOF
     } else {
       $options->{'displayHost'}   = $HOSTFQDN;
     }
-    
+
     if ($options->{'displayHost'} ne $HOST &&
         $options->{'displayHost'} ne $HOSTFQDN) {
       my @cmdPrefix = ("ssh", "$options->{'displayHost'}", "tigervncserver");
@@ -1323,7 +1323,7 @@ SCRIPTEOF
       }
       exit 0;
     }
-    
+
     unless (defined $options->{'PlainUsers'}) {
       chomp($options->{'PlainUsers'} = `/usr/bin/id -u -n`);
     }
@@ -1404,7 +1404,7 @@ SCRIPTEOF
       print STDERR "local machine. These users can access your server without authentication!\n";
     }
   }
-  
+
   my $runningUserVncservers = &runningUserVncservers($options);
   my @vncs = ();
   if (defined $options->{'displayNumber'}) {
@@ -1432,7 +1432,7 @@ SCRIPTEOF
     # Find display number.
     push @vncs, &getDisplayNumber();
   }
-  
+
   if ($options->{'kill'}) {
     my $err = &killXvncServer($options, $runningUserVncservers, \@vncs);
     exit($err ? 1 : 0);
@@ -1441,7 +1441,7 @@ SCRIPTEOF
     exit 0;
   } else {
     $options->{'displayNumber'} = $vncs[0];
-    
+
     &checkGeometryAndDepth($options);
     my $haveOld =
       $runningUserVncservers->{$options->{'displayNumber'}} &&

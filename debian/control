@@ -137,7 +137,7 @@ Depends:
  ${shlibs:Depends},
  ${misc:Depends},
 Recommends:
- tigervnc-common 
+ tigervnc-common
 Provides:
  vnc-server
 Replaces: tigervnc-server (<< 1.1.90)
@@ -180,7 +180,7 @@ Provides:
  xserver
 Replaces: tigervnc-server (<< 1.1.90)
 Breaks: tigervnc-server (<< 1.1.90)
-Description: Standalone virtual network computing server 
+Description: Standalone virtual network computing server
  VNC stands for Virtual Network Computing. It is, in essence, a remote
  display system which allows you to view a computing `desktop' environment
  not only on the machine where it is running, but from anywhere on the
@@ -200,7 +200,7 @@ Depends:
  ${shlibs:Depends},
  ${misc:Depends},
 Recommends:
- tigervnc-common 
+ tigervnc-common
 Provides:
  vnc-server,
  vnc-xorg-extension
