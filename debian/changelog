@@ -4,6 +4,8 @@ tigervnc (1.9.0+dfsg-3~RC1) UNRELEASED; urgency=medium
   * Add missing dependency on libunwind-dev according to xorg-server-1.20.3
     control file. (Closes: #911712).
   * Fixed linitian complaints about patches/series.
+  * Replace media/icons/tigervnc_16.png of wrong dimensions 20x20 by our fixed
+    version.
 
  -- Joachim Falk <joachim.falk@gmx.de>  Tue, 06 Nov 2018 22:51:54 +0100
 

@@ -266,6 +266,9 @@ install/tigervnc-viewer::
 	  cp media/icons/tigervnc_$${i}.png \
 	    $(DEB_DESTDIR)/usr/share/icons/hicolor/$${i}x$${i}/apps/tigervnc.png; \
 	done
+	# Hack, replace media/icons/tigervnc_16.png of wrong dimensions 20x20 by our fixed version.
+	cp debian/tigervnc_16.png \
+	  $(DEB_DESTDIR)/usr/share/icons/hicolor/16x16/apps/tigervnc.png
 
 install/tigervnc-standalone-server install/tigervnc-xorg-extension::
 	$(MAKE) TIGERVNC_BUILDDIR="$(CURDIR)/$(DEB_BUILDDIR)" -C $(DEB_BUILDDIR)/unix/xserver/hw/vnc DESTDIR=$(DEB_DESTDIR) install
