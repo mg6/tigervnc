@@ -13,7 +13,7 @@ rh/tigervnc-cursor.patch
 #rh/dustbin/tigervnc-1.3.1-do-not-die-when-port-is-already-taken.patch # not required as we have our own tigervncserver wrapper script
 rh/tigervnc-working-tls-on-fips-systems.patch
 #rh/dustbin/0001-rpath-hack.patch # Hopefully Vendor neutral GL dispatch makes this hack obsolete
-#rh/dustbin/tigervnc-xserver119.patch # buster has xserver120 and TigerVNC 1.19 comes with official support for it
+#rh/dustbin/tigervnc-xserver119.patch # buster has xserver120 and TigerVNC 1.9 comes with official support for it
 
 find-fltk-libs.diff
 fix-linking.diff
