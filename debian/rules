@@ -15,7 +15,6 @@ DEB_SRCDIR   = .
 #VNC_PATCH = $(CURDIR)/unix/xserver117.patch
 # However in this case we do not have this file from upstream so we use a
 # debian specific copy instead.
-#VNC_PATCH = $(CURDIR)/debian/xserver119-buster.patch
 #VNC_PATCH = $(CURDIR)/unix/xserver119.patch
 VNC_PATCH = $(CURDIR)/unix/xserver120.patch
 VNC_LIBTOOL_PATCH = $(CURDIR)/contrib/packages/deb/ubuntu-xenial/debian/xorg-source-patches/debian_libtool.patch
