@@ -1,7 +1,10 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0
-Upstream-Name: tigervnc
+Upstream-Name: TigerVNC
 Upstream-Contact: Peter Åstrand, Pierre Ossman, Adam Tkac
-Source: http://sourceforge.net/apps/mediawiki/tigervnc/index.php
+Source: https://tigervnc.org
+Files-Excluded: win
+Comment: The win directory was removed because it is not needed for a Unix
+ based build.
 
 Files: *
 Copyright: Copyright (C) 1999 AT&T Laboratories Cambridge
