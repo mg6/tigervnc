@@ -15,7 +15,6 @@ Uploaders:
 # everything on is for the DMX and Xnest servers.
 Build-Depends:
  cdbs (>= 0.4.89),
-# dh-autoreconf,
  cmake (>= 2.8),
  pristine-tar,
  gettext,
@@ -31,7 +30,6 @@ Build-Depends:
  xserver-xorg-dev,
 # this are dependencies from xorg-server-1.20.3 source deb
  debhelper (>= 10),
- dh-autoreconf,
  po-debconf,
  dpkg-dev (>= 1.16.1),
  quilt,
