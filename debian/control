@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: TigerVNC Packaging Team <pkg-tigervnc-devel@lists.alioth.debian.org>
 Uploaders:
  Joachim Falk <joachim.falk@gmx.de>,
- Mike Gabriel <mike.gabriel@das-netzwerkteam.de>,
+ Mike Gabriel <sunweaver@debian.org>,
  Yaroslav Halchenko <debian@onerussian.com>,
  Ola Lundqvist <opal@debian.org>,
  Liang Guo <guoliang@debian.org>,
