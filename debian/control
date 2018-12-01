@@ -114,9 +114,12 @@ Architecture: any
 Depends:
  ${shlibs:Depends},
  ${misc:Depends},
-Conflicts:
+Breaks:
  tigervnc-server (<< 1.1.90),
- tigervnc-viewer (<< 1.1.90)
+ tigervnc-viewer (<< 1.1.90),
+Replaces:
+ tigervnc-server (<< 1.1.90),
+ tigervnc-viewer (<< 1.1.90),
 Description: Virtual network computing; Common software needed by servers
  VNC stands for Virtual Network Computing. It is, in essence, a remote
  display system which allows you to view a computing `desktop' environment
