@@ -1,4 +1,4 @@
-tigervnc (1.9.0+dfsg-3~RC1) UNRELEASED; urgency=medium
+tigervnc (1.9.0+dfsg-3) unstable; urgency=medium
 
   [ Joachim Falk ]
   * Add missing dependency on libunwind-dev according to xorg-server-1.20.3
@@ -13,7 +13,22 @@ tigervnc (1.9.0+dfsg-3~RC1) UNRELEASED; urgency=medium
     excluding files specified in debian/copyright.
   * Updated xtigervncviewer.desktop to shut up AppStream hint errors.
 
- -- Joachim Falk <joachim.falk@gmx.de>  Wed, 07 Nov 2018 01:02:04 +0100
+  [ Mike Gabriel ]
+  * debian/patches:
+    + Add patch headers to all patches currently in use.
+  * debian/control:
+    + Turn versioned Conflicts: into Breaks:/Replaces: relation.
+    + Bump Standards-Version: to 4.2.1. No changes needed.
+    + Use my @debian.org mail address in Uploaders: field.
+    + Drop B-D on dh-autoreconf. Not required for DH compat level 10 and above.
+  * debian/rules:
+    + Enable all hardening build flags.
+    + Remove empty line at EOF.
+  * debian/{control,compat}:
+    + Bump DH compat level to version 10 (for now, as CDBS does not yet
+      support version 11).
+
+ -- Mike Gabriel <sunweaver@debian.org>  Sat, 01 Dec 2018 22:51:29 +0100
 
 tigervnc (1.9.0+dfsg-2) unstable; urgency=medium
 
