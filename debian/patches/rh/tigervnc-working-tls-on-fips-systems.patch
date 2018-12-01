@@ -1,3 +1,6 @@
+Description: Get TigerVNC's TLS working on fips systems.
+Author: <unknown>
+
 Index: pkg-tigervnc/common/rfb/SSecurityTLS.cxx
 ===================================================================
 --- pkg-tigervnc.orig/common/rfb/SSecurityTLS.cxx

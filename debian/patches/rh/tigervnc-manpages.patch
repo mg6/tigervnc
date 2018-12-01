@@ -1,3 +1,6 @@
+Description: Add help output for options -display and -geometry."
+Author: <unknown>
+
 Index: pkg-tigervnc/unix/vncserver
 ===================================================================
 --- pkg-tigervnc.orig/unix/vncserver

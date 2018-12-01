@@ -1,3 +1,6 @@
+Description: Find fltk shared libraries
+Author: <unkonwn>
+
 Index: pkg-tigervnc/CMakeLists.txt
 ===================================================================
 --- pkg-tigervnc.orig/CMakeLists.txt

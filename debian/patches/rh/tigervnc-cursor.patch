@@ -1,3 +1,6 @@
+Description: Make sure cursor is defined before using it.
+Author: <unknown>
+
 Index: pkg-tigervnc/vncviewer/Viewport.cxx
 ===================================================================
 --- pkg-tigervnc.orig/vncviewer/Viewport.cxx

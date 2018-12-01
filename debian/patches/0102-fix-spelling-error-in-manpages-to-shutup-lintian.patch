@@ -1,3 +1,6 @@
+Description: Fix spelling error in manpages to silence lintian.
+Author: <unknown>
+
 Index: pkg-tigervnc/unix/x0vncserver/x0vncserver.man
 ===================================================================
 --- pkg-tigervnc.orig/unix/x0vncserver/x0vncserver.man
