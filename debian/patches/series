@@ -1,5 +1,6 @@
 0102-fix-spelling-error-in-manpages-to-shutup-lintian.patch
 0151-make-cmake-enable-options-mandatory-if-turned-on.patch
+0175-xtigervncviewer-WM_CLASS.patch
 # rework/0200-add-tcpwrappers-support.patch # This patch is still not ported
 
 # These patches are lifted from RedHat

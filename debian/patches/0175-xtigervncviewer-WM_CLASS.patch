@@ -1,0 +1,16 @@
+Description: Update WM_CLASS to correspond to the one given in the xtigervncviewer.desktop file
+Author: Joachim Falk
+
+Index: pkg-tigervnc/vncviewer/vncviewer.cxx
+===================================================================
+--- pkg-tigervnc.orig/vncviewer/vncviewer.cxx
++++ pkg-tigervnc/vncviewer/vncviewer.cxx
+@@ -197,7 +197,7 @@ static void init_fltk()
+ 
+   // Proper Gnome Shell integration requires that we set a sensible
+   // WM_CLASS for the window.
+-  Fl_Window::default_xclass("vncviewer");
++  Fl_Window::default_xclass("TigerVNC Viewer");
+ 
+   // Set the default icon for all windows.
+ #ifdef WIN32

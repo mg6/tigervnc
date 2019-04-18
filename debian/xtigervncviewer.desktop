@@ -2,10 +2,11 @@
 Version=1.0
 Name=TigerVNC Viewer
 GenericName=Remote Desktop Client
-Comment=Connect to a remote VNC desktop
+Comment=Connect to VNC server and display remote desktop
 Keywords=remote desktop;vnc;
-Categories=Network;
 Exec=/usr/bin/xtigervncviewer
 Icon=tigervnc
-Terminal=false
 Type=Application
+StartupWMClass=TigerVNC Viewer
+Categories=Network;RemoteAccess;
+Terminal=false
