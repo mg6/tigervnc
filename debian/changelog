@@ -1,10 +1,13 @@
-tigervnc (1.9.0+dfsg-4~RC1) UNRELEASED; urgency=medium
+tigervnc (1.9.0+dfsg-4~RC2) UNRELEASED; urgency=medium
 
   [ Joachim Falk ]
   * Fix gnome shell integration of xtigervncviewer by updating
-    xtigervncviewer.desktop and WM_CLASS of xtigervncviewer.
+    xtigervncviewer.desktop and WM_CLASS of xtigervncviewer. (Closes: #905905)
+  * Added missing dependencies to enable RANDR support in x0tigervncserver,
+    i.e., tigervnc-scraping-server. Also ensure that dropping these
+    dependencies will lead to a fatal build error in the future. (Closes: #929410)
 
-  -- Joachim Falk <joachim.falk@gmx.de>  Thu, 18 Apr 2019 18:47:55 +0200
+  -- Joachim Falk <joachim.falk@gmx.de>  Sat, 15 Jun 2019 13:24:32 +0200
 
 tigervnc (1.9.0+dfsg-3) unstable; urgency=medium
 

@@ -17,6 +17,7 @@ rh/tigervnc-working-tls-on-fips-systems.patch
 #rh/dustbin/tigervnc-xserver119.patch # buster has xserver120 and TigerVNC 1.9 comes with official support for it
 
 find-fltk-libs.diff
+x0vncserver-build-make-missing-libraries-fatal-errors.diff
 fix-linking.diff
 
 #dustbin/tigervnc11-gethomedir.patch does not apply cleanly and no longer needed for TigerVNC 1.8
