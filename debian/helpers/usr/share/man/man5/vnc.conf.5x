@@ -9,7 +9,7 @@
 .\" License as specified in the file COPYING that comes with the
 .\" Debian GNU/Linux distribution.
 .\"
-.TH vnc.conf 5x "Jan 5th, 2017" "TigerVNC 1.7" "Virtual Network Computing"
+.TH vnc.conf 5x "Jul 18th, 2019" "TigerVNC 1.9" "Virtual Network Computing"
 .SH NAME
 vnc.conf \- configuration file for Virtual Network Computing
 .SH SYNOPSIS
