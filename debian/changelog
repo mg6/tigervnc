@@ -1,4 +1,4 @@
-tigervnc (1.9.0+dfsg-4~RC3) UNRELEASED; urgency=medium
+tigervnc (1.9.0+dfsg-4~RC4) UNRELEASED; urgency=medium
 
   [ Joachim Falk ]
   * Fix gnome shell integration of xtigervncviewer by updating
@@ -8,8 +8,9 @@ tigervnc (1.9.0+dfsg-4~RC3) UNRELEASED; urgency=medium
     dependencies will lead to a fatal build error in the future. (Closes: #929410)
   * Bumped version number in Debian provided man pages to TigerVNC 1.9
     (Closes: #932264).
+  * Fixed two typos in Debian provided tigervncserver man page.
 
- -- Joachim Falk <joachim.falk@gmx.de>  Thu, 18 Jul 2019 18:06:42 +0200
+ -- Joachim Falk <joachim.falk@gmx.de>  Thu, 18 Jul 2019 22:34:51 +0200
 
 tigervnc (1.9.0+dfsg-3) unstable; urgency=medium
 
