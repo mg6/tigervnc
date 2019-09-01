@@ -1,4 +1,4 @@
-tigervnc (1.9.0+dfsg-4~RC5) UNRELEASED; urgency=medium
+tigervnc (1.9.0+dfsg-4~RC6) UNRELEASED; urgency=medium
 
   [ Joachim Falk ]
   * Fix gnome shell integration of xtigervncviewer by updating
@@ -11,8 +11,10 @@ tigervnc (1.9.0+dfsg-4~RC5) UNRELEASED; urgency=medium
   * Fixed two typos in Debian provided tigervncserver man page.
   * Fix crash on disconnect for TigerVNC 1.9 if internal http server used
     (Closes: #932832).
+  * Added missing dependency on netbase for tigervnc-standalone-server
+    to enable perl function getprotobyname() (Closes: #939055).
 
- -- Joachim Falk <joachim.falk@gmx.de>  Tue, 23 Jul 2019 21:00:06 +0200
+ -- Joachim Falk <joachim.falk@gmx.de>  Sun, 01 Sep 2019 19:26:30 +0200
 
 tigervnc (1.9.0+dfsg-3) unstable; urgency=medium
 

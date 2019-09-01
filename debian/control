@@ -161,6 +161,7 @@ Depends:
  x11-xkb-utils,
  xauth,
  libfile-readbackwards-perl (>= 1.05),
+ netbase,
  ${shlibs:Depends},
  ${misc:Depends},
  ${perl:Depends}
