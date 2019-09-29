@@ -1,11 +1,12 @@
-tigervnc (1.9.0+dfsg-4~RC6) UNRELEASED; urgency=medium
+tigervnc (1.9.0+dfsg-4) unstable; urgency=medium
 
   [ Joachim Falk ]
   * Fix gnome shell integration of xtigervncviewer by updating
     xtigervncviewer.desktop and WM_CLASS of xtigervncviewer. (Closes: #905905)
   * Added missing dependencies to enable RANDR support in x0tigervncserver,
     i.e., tigervnc-scraping-server. Also ensure that dropping these
-    dependencies will lead to a fatal build error in the future. (Closes: #929410)
+    dependencies will lead to a fatal build error in the future. (Closes:
+    #929410)
   * Bumped version number in Debian provided man pages to TigerVNC 1.9
     (Closes: #932264).
   * Fixed two typos in Debian provided tigervncserver man page.
@@ -14,7 +15,11 @@ tigervnc (1.9.0+dfsg-4~RC6) UNRELEASED; urgency=medium
   * Added missing dependency on netbase for tigervnc-standalone-server
     to enable perl function getprotobyname() (Closes: #939055).
 
- -- Joachim Falk <joachim.falk@gmx.de>  Sun, 01 Sep 2019 19:26:30 +0200
+  [ Mike Gabriel ]
+  * debian/control:
+    + Bump Standards-Version: to 4.4.0. No changes needed.
+
+ -- Mike Gabriel <sunweaver@debian.org>  Sat, 28 Sep 2019 12:06:12 +0200
 
 tigervnc (1.9.0+dfsg-3) unstable; urgency=medium
 
