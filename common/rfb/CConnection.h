@@ -1,5 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
- * Copyright 2011-2017 Pierre Ossman for Cendio AB
+ * Copyright 2011-2019 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -62,10 +62,6 @@ namespace rfb {
     // server upon initialisation.
     void setShared(bool s) { shared = s; }
 
-    // setProtocol3_3 configures whether or not the CConnection should
-    // only ever support protocol version 3.3
-    void setProtocol3_3(bool s) {useProtocol3_3 = s;}
-
     // setFramebuffer configures the PixelBuffer that the CConnection
     // should render all pixel data in to. Note that the CConnection
     // takes ownership of the PixelBuffer and it must not be deleted by
@@ -100,6 +96,12 @@ namespace rfb {
                                         int w, int h,
                                         const ScreenSet& layout);
 
+    virtual void endOfContinuousUpdates();
+
+    virtual void serverInit(int width, int height,
+                            const PixelFormat& pf,
+                            const char* name);
+
     virtual void readAndDecodeRect(const Rect& r, int encoding,
                                    ModifiablePixelBuffer* pb);
 
@@ -107,22 +109,89 @@ namespace rfb {
     virtual void framebufferUpdateEnd();
     virtual void dataRect(const Rect& r, int encoding);
 
+    virtual void serverCutText(const char* str);
+
+    virtual void handleClipboardCaps(rdr::U32 flags,
+                                     const rdr::U32* lengths);
+    virtual void handleClipboardRequest(rdr::U32 flags);
+    virtual void handleClipboardPeek(rdr::U32 flags);
+    virtual void handleClipboardNotify(rdr::U32 flags);
+    virtual void handleClipboardProvide(rdr::U32 flags,
+                                        const size_t* lengths,
+                                        const rdr::U8* const* data);
+
 
     // Methods to be overridden in a derived class
-
-    // getIdVerifier() returns the identity verifier associated with the connection.
-    // Ownership of the IdentityVerifier is retained by the CConnection instance.
-    virtual IdentityVerifier* getIdentityVerifier() {return 0;}
 
     // authSuccess() is called when authentication has succeeded.
     virtual void authSuccess();
 
-    // serverInit() is called when the ServerInit message is received.  The
-    // derived class must call on to CConnection::serverInit().
-    virtual void serverInit();
+    // initDone() is called when the connection is fully established
+    // and standard messages can be sent. This is called before the
+    // initial FramebufferUpdateRequest giving a derived class the
+    // chance to modify pixel format and settings. The derived class
+    // must also make sure it has provided a valid framebuffer before
+    // returning.
+    virtual void initDone() = 0;
+
+    // resizeFramebuffer() is called whenever the framebuffer
+    // dimensions or the screen layout changes. A subclass must make
+    // sure the pixel buffer has been updated once this call returns.
+    virtual void resizeFramebuffer();
+
+    // handleClipboardRequest() is called whenever the server requests
+    // the client to send over its clipboard data. It will only be
+    // called after the client has first announced a clipboard change
+    // via announceClipboard().
+    virtual void handleClipboardRequest();
+
+    // handleClipboardAnnounce() is called to indicate a change in the
+    // clipboard on the server. Call requestClipboard() to access the
+    // actual data.
+    virtual void handleClipboardAnnounce(bool available);
+
+    // handleClipboardData() is called when the server has sent over
+    // the clipboard data as a result of a previous call to
+    // requestClipboard(). Note that this function might never be
+    // called if the clipboard data was no longer available when the
+    // server received the request.
+    virtual void handleClipboardData(const char* data);
 
 
     // Other methods
+
+    // requestClipboard() will result in a request to the server to
+    // transfer its clipboard data. A call to handleClipboardData()
+    // will be made once the data is available.
+    virtual void requestClipboard();
+
+    // announceClipboard() informs the server of changes to the
+    // clipboard on the client. The server may later request the
+    // clipboard data via handleClipboardRequest().
+    virtual void announceClipboard(bool available);
+
+    // sendClipboardData() transfers the clipboard data to the server
+    // and should be called whenever the server has requested the
+    // clipboard via handleClipboardRequest().
+    virtual void sendClipboardData(const char* data);
+
+    // refreshFramebuffer() forces a complete refresh of the entire
+    // framebuffer
+    void refreshFramebuffer();
+
+    // setPreferredEncoding()/getPreferredEncoding() adjusts which
+    // encoding is listed first as a hint to the server that it is the
+    // preferred one
+    void setPreferredEncoding(int encoding);
+    int getPreferredEncoding();
+    // setCompressLevel()/setQualityLevel() controls the encoding hints
+    // sent to the server
+    void setCompressLevel(int level);
+    void setQualityLevel(int level);
+    // setPF() controls the pixel format requested from the server.
+    // server.pf() will automatically be adjusted once the new format
+    // is active.
+    void setPF(const PixelFormat& pf);
 
     CMsgReader* reader() { return reader_; }
     CMsgWriter* writer() { return writer_; }
@@ -159,6 +228,13 @@ namespace rfb {
 
     ModifiablePixelBuffer* getFramebuffer() { return framebuffer; }
 
+  protected:
+    // Optional capabilities that a subclass is expected to set to true
+    // if supported
+    bool supportsLocalCursor;
+    bool supportsDesktopResize;
+    bool supportsLEDState;
+
   private:
     // This is a default implementation of fences that automatically
     // responds to requests, stating no support for synchronisation.
@@ -176,6 +252,9 @@ namespace rfb {
     void throwConnFailedException();
     void securityCompleted();
 
+    void requestNewUpdate();
+    void updateEncodings();
+
     rdr::InStream* is;
     rdr::OutStream* os;
     CMsgReader* reader_;
@@ -186,10 +265,28 @@ namespace rfb {
 
     CharArray serverName;
 
-    bool useProtocol3_3;
+    bool pendingPFChange;
+    rfb::PixelFormat pendingPF;
+
+    int preferredEncoding;
+    int compressLevel;
+    int qualityLevel;
+
+    bool formatChange;
+    rfb::PixelFormat nextPF;
+    bool encodingChange;
+
+    bool firstUpdate;
+    bool pendingUpdate;
+    bool continuousUpdates;
+
+    bool forceNonincremental;
 
     ModifiablePixelBuffer* framebuffer;
     DecodeManager decoder;
+
+    char* serverClipboard;
+    bool hasLocalClipboard;
   };
 }
 #endif

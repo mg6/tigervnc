@@ -36,8 +36,6 @@ public:
   CConn(const char* vncServerName, network::Socket* sock);
   ~CConn();
 
-  void refreshFramebuffer();
-
   const char *connectionInfo();
 
   unsigned getUpdateCount();
@@ -51,7 +49,7 @@ public:
   static void socketEvent(FL_SOCKET fd, void *data);
 
   // CConnection callback methods
-  void serverInit();
+  void initDone();
 
   void setDesktopSize(int w, int h);
   void setExtendedDesktopSize(unsigned reason, unsigned result,
@@ -62,8 +60,6 @@ public:
   void setColourMapEntries(int firstColour, int nColours, rdr::U16* rgbs);
 
   void bell();
-
-  void serverCutText(const char* str, rdr::U32 len);
 
   void framebufferUpdateStart();
   void framebufferUpdateEnd();
@@ -76,13 +72,16 @@ public:
 
   void setLEDState(unsigned int state);
 
+  virtual void handleClipboardRequest();
+  virtual void handleClipboardAnnounce(bool available);
+  virtual void handleClipboardData(const char* data);
+
 private:
 
   void resizeFramebuffer();
 
   void autoSelectFormatAndEncoding();
-  void checkEncodings();
-  void requestNewUpdate();
+  void updatePixelFormat();
 
   static void handleOptions(void *data);
 
@@ -101,21 +100,7 @@ private:
   rfb::PixelFormat serverPF;
   rfb::PixelFormat fullColourPF;
 
-  bool pendingPFChange;
-  rfb::PixelFormat pendingPF;
-
-  int currentEncoding, lastServerEncoding;
-
-  bool formatChange;
-  bool encodingChange;
-
-  bool firstUpdate;
-  bool pendingUpdate;
-  bool continuousUpdates;
-
-  bool forceNonincremental;
-
-  bool supportsSyncFence;
+  int lastServerEncoding;
 };
 
 #endif

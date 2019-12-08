@@ -1,1 +1,15 @@
 tigervnc-tags
+
+*.[ao]
+*.mo
+*.la
+*.lo
+.deps
+.libs
+
+CMakeFiles
+CMakeCache.txt
+*.cmake
+Makefile
+Makefile.in
+config.h

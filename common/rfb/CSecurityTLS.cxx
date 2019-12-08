@@ -34,7 +34,6 @@
 #endif
 
 #include <rfb/CSecurityTLS.h>
-#include <rfb/SSecurityVeNCrypt.h> 
 #include <rfb/CConnection.h>
 #include <rfb/LogWriter.h>
 #include <rfb/Exception.h>
@@ -67,8 +66,9 @@ StringParameter CSecurityTLS::X509CRL("X509CRL", "X509 CRL file", "", ConfViewer
 
 static LogWriter vlog("TLS");
 
-CSecurityTLS::CSecurityTLS(bool _anon) : session(0), anon_cred(0),
-						 anon(_anon), fis(0), fos(0)
+CSecurityTLS::CSecurityTLS(CConnection* cc, bool _anon)
+  : CSecurity(cc), session(NULL), anon_cred(NULL), cert_cred(NULL),
+    anon(_anon), tlsis(NULL), tlsos(NULL), rawis(NULL), rawos(NULL)
 {
   cafile = X509CA.getData();
   crlfile = X509CRL.getData();
@@ -94,9 +94,9 @@ void CSecurityTLS::setDefaults()
   delete [] homeDir;
 
  if (!fileexists(caDefault.buf))
-   X509CA.setDefaultStr(strdup(caDefault.buf));
+   X509CA.setDefaultStr(caDefault.buf);
  if (!fileexists(crlDefault.buf))
-   X509CRL.setDefaultStr(strdup(crlDefault.buf));
+   X509CRL.setDefaultStr(crlDefault.buf);
 }
 
 void CSecurityTLS::shutdown(bool needbye)
@@ -115,6 +115,21 @@ void CSecurityTLS::shutdown(bool needbye)
     cert_cred = 0;
   }
 
+  if (rawis && rawos) {
+    cc->setStreams(rawis, rawos);
+    rawis = NULL;
+    rawos = NULL;
+  }
+
+  if (tlsis) {
+    delete tlsis;
+    tlsis = NULL;
+  }
+  if (tlsos) {
+    delete tlsos;
+    tlsos = NULL;
+  }
+
   if (session) {
     gnutls_deinit(session);
     session = 0;
@@ -126,18 +141,13 @@ CSecurityTLS::~CSecurityTLS()
 {
   shutdown(true);
 
-  if (fis)
-    delete fis;
-  if (fos)
-    delete fos;
-
   delete[] cafile;
   delete[] crlfile;
 
   gnutls_global_deinit();
 }
 
-bool CSecurityTLS::processMsg(CConnection* cc)
+bool CSecurityTLS::processMsg()
 {
   rdr::InStream* is = cc->getInStream();
   rdr::OutStream* os = cc->getOutStream();
@@ -164,17 +174,19 @@ bool CSecurityTLS::processMsg(CConnection* cc)
       throw AuthFailureException("gnutls_set_default_priority failed");
 
     setParam();
-  }
 
-  rdr::TLSInStream *tlsis = new rdr::TLSInStream(is, session);
-  rdr::TLSOutStream *tlsos = new rdr::TLSOutStream(os, session);
+    // Create these early as they set up the push/pull functions
+    // for GnuTLS
+    tlsis = new rdr::TLSInStream(is, session);
+    tlsos = new rdr::TLSOutStream(os, session);
+
+    rawis = is;
+    rawos = os;
+  }
 
   int err;
   err = gnutls_handshake(session);
   if (err != GNUTLS_E_SUCCESS) {
-    delete tlsis;
-    delete tlsos;
-
     if (!gnutls_error_is_fatal(err))
       return false;
 
@@ -183,9 +195,12 @@ bool CSecurityTLS::processMsg(CConnection* cc)
     throw AuthFailureException("TLS Handshake failed");
   }
 
+  vlog.debug("TLS handshake completed with %s",
+             gnutls_session_get_desc(session));
+
   checkSession();
 
-  cc->setStreams(fis = tlsis, fos = tlsos);
+  cc->setStreams(tlsis, tlsos);
 
   return true;
 }
@@ -228,6 +243,9 @@ void CSecurityTLS::setParam()
   } else {
     if (gnutls_certificate_allocate_credentials(&cert_cred) != GNUTLS_E_SUCCESS)
       throw AuthFailureException("gnutls_certificate_allocate_credentials failed");
+
+    if (gnutls_certificate_set_x509_system_trust(cert_cred) != GNUTLS_E_SUCCESS)
+      vlog.error("Could not load system certificate trust store");
 
     if (*cafile && gnutls_certificate_set_x509_trust_file(cert_cred,cafile,GNUTLS_X509_FMT_PEM) < 0)
       throw AuthFailureException("load of CA cert failed");
@@ -373,7 +391,7 @@ void CSecurityTLS::checkSession()
                           "authority:\n\n%s\n\nDo you want to save it and "
                           "continue?\n ", info.data);
   if (len < 0)
-    AuthFailureException("certificate decoding error");
+    throw AuthFailureException("certificate decoding error");
 
   vlog.debug("%s", info.data);
 
@@ -399,16 +417,16 @@ void CSecurityTLS::checkSession()
 
   if (gnutls_x509_crt_export(crt, GNUTLS_X509_FMT_PEM, NULL, &out_size)
       == GNUTLS_E_SHORT_MEMORY_BUFFER)
-    AuthFailureException("Out of memory");
+    throw AuthFailureException("Out of memory");
 
   // Save cert
   out_buf =  new char[out_size];
   if (out_buf == NULL)
-    AuthFailureException("Out of memory");
+    throw AuthFailureException("Out of memory");
 
   if (gnutls_x509_crt_export(crt, GNUTLS_X509_FMT_PEM, out_buf, &out_size) < 0)
-    AuthFailureException("certificate issuer unknown, and certificate "
-			 "export failed");
+    throw AuthFailureException("certificate issuer unknown, and certificate "
+                               "export failed");
 
   char *homeDir = NULL;
   if (getvnchomedir(&homeDir) == -1)

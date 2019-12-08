@@ -1,16 +1,6 @@
-%{!?_self_signed: %define _self_signed 1}
-%{!?_bootstrap: %define _bootstrap 1}
-%define tigervnc_src_dir %{_builddir}/%{name}-%{version}%{?snap:-%{snap}}
-%global scl_name %{name}16
-%if %{_bootstrap}
-%define static_lib_buildroot %{tigervnc_src_dir}/opt/%{name}/%{scl_name}
-%else
-%define static_lib_buildroot /opt/%{name}/%{scl_name}
-%endif
-
 Name:           tigervnc
-Version:        1.6.80
-Release:        1%{?snap:.%{snap}}%{?dist}
+Version:        @VERSION@
+Release:        4%{?snap:.%{snap}}%{?dist}
 Summary:        A TigerVNC remote display system
 
 Group:          User Interface/Desktops
@@ -22,7 +12,6 @@ Source0:        %{name}-%{version}%{?snap:-%{snap}}.tar.bz2
 Source1:        vncserver.service
 Source2:        vncserver.sysconfig
 Source3:        10-libvnc.conf
-Source11:	http://fltk.org/pub/fltk/1.3.3/fltk-1.3.3-source.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildRequires:  libX11-devel, automake, autoconf, libtool, gettext, gettext-autopoint
@@ -32,7 +21,7 @@ BuildRequires:  libdrm-devel, libXt-devel, pixman-devel libXfont-devel
 BuildRequires:  libxkbfile-devel, openssl-devel, libpciaccess-devel
 BuildRequires:  mesa-libGL-devel, libXinerama-devel, ImageMagick
 BuildRequires:  freetype-devel, libXdmcp-devel, libXfont2-devel
-BuildRequires:  java-devel, jpackage-utils
+BuildRequires:  libXrandr-devel, fltk-devel >= 1.3.3
 BuildRequires:  libjpeg-turbo-devel, gnutls-devel, pam-devel
 BuildRequires:  systemd, cmake
 
@@ -40,8 +29,8 @@ Requires(post):   coreutils
 Requires(postun): coreutils
 
 Requires:       hicolor-icon-theme
-Requires:       tigervnc-license
-Requires:       tigervnc-icons
+Requires:       tigervnc-license = %{version}-%{release}
+Requires:       tigervnc-icons = %{version}-%{release}
 
 Provides:       vnc = 4.1.3-2, vnc-libs = 4.1.3-2
 Obsoletes:      vnc < 4.1.3-2, vnc-libs < 4.1.3-2
@@ -66,7 +55,7 @@ Obsoletes:      vnc-server < 4.1.3-2, vnc-libs < 4.1.3-2
 Provides:       tightvnc-server = 1.5.0-0.15.20090204svn3586
 Obsoletes:      tightvnc-server < 1.5.0-0.15.20090204svn3586
 Requires:       perl
-Requires:       tigervnc-server-minimal
+Requires:       tigervnc-server-minimal = %{version}-%{release}
 Requires:       xorg-x11-xauth
 Requires:       xorg-x11-xinit
 Requires(post):   systemd
@@ -90,7 +79,7 @@ Requires(preun):  initscripts
 Requires(postun): initscripts
 
 Requires:         mesa-dri-drivers, xkeyboard-config, xorg-x11-xkb-utils
-Requires:         tigervnc-license
+Requires:         tigervnc-license = %{version}-%{release}
 
 %description server-minimal
 The VNC system allows you to access the same desktop from a wide
@@ -107,22 +96,12 @@ Obsoletes:      vnc-server < 4.1.3-2, vnc-libs < 4.1.3-2
 Provides:       tightvnc-server-module = 1.5.0-0.15.20090204svn3586
 Obsoletes:      tightvnc-server-module < 1.5.0-0.15.20090204svn3586
 Requires:       xorg-x11-server-Xorg
-Requires:       tigervnc-license
+Requires:       tigervnc-license = %{version}-%{release}
 
 %description server-module
 This package contains libvnc.so module to X server, allowing others
 to access the desktop on your machine.
 %endif
-
-%package server-applet
-Summary:        Java TigerVNC viewer applet for TigerVNC server
-Group:          User Interface/X
-Requires:       tigervnc-server, java, jpackage-utils
-BuildArch:      noarch
-
-%description server-applet
-The Java TigerVNC viewer applet for web browsers. Install this package to allow
-clients to use web browser when connect to the TigerVNC server.
 
 %package license
 Summary:        License of TigerVNC suite
@@ -140,84 +119,35 @@ BuildArch:      noarch
 %description icons
 This package contains icons for TigerVNC viewer
 
-%if %{_bootstrap}
-%package static-devel
-Summary: Static development files necessary to build TigerVNC
-Group: Development/Libraries
-
-%description static-devel
-This package contains static development files necessary to build TigerVNC
-%endif
-
 %prep
 rm -rf $RPM_BUILD_ROOT
 %setup -q -n %{name}-%{version}%{?snap:-%{snap}}
-
-%if %{_bootstrap}
-tar xzf %SOURCE11
-%endif
 
 cp -r /usr/share/xorg-x11-server-source/* unix/xserver
 pushd unix/xserver
 for all in `find . -type f -perm -001`; do
         chmod -x "$all"
 done
-patch -p1 -b --suffix .vnc < ../xserver119.patch
+patch -p1 -b --suffix .vnc < ../xserver120.patch
 popd
 
 # Don't use shebang in vncserver script.
 %patch17 -p1 -b .shebang
 
 %build
-%if %{_bootstrap}
-mkdir -p %{static_lib_buildroot}%{_libdir}
-%endif
-
 %ifarch sparcv9 sparc64 s390 s390x
-export CFLAGS="$RPM_OPT_FLAGS -fPIC -I%{static_lib_buildroot}%{_includedir}"
+export CFLAGS="$RPM_OPT_FLAGS -fPIC"
 %else
-export CFLAGS="$RPM_OPT_FLAGS -fpic -I%{static_lib_buildroot}%{_includedir}"
+export CFLAGS="$RPM_OPT_FLAGS -fpic"
 %endif
 export CXXFLAGS="$CFLAGS"
 export CPPFLAGS="$CXXFLAGS"
-export PKG_CONFIG_PATH="%{static_lib_buildroot}%{_libdir}/pkgconfig:%{static_lib_buildroot}%{_datadir}/pkgconfig:%{_libdir}/pkgconfig:%{_datadir}/pkgconfig"
 
-%if %{_bootstrap}
-echo "*** Building fltk ***"
-pushd fltk-*
-%endif
-export CMAKE_PREFIX_PATH="%{static_lib_buildroot}%{_prefix}:%{_prefix}"
 export CMAKE_EXE_LINKER_FLAGS=$LDFLAGS
-export PKG_CONFIG="pkg-config --static"
-%if %{_bootstrap}
-#CFLAGS="${CFLAGS}" CXXFLAGS="${CXXFLAGS}" LDFLAGS="-L%{static_lib_buildroot}%{_libdir} -Wl,-Bstatic -lpng -Wl,-Bdynamic $LDFLAGS" 
-./configure \
-  --prefix=%{_prefix} \
-  --libdir=%{_libdir} \
-  --host=%{_host} \
-  --build=%{_build} \
-  --enable-x11 \
-  --enable-gl \
-  --disable-shared \
-  --enable-localjpeg \
-  --enable-localzlib \
-  --disable-localpng \
-  --enable-xinerama \
-  --enable-xft \
-  --enable-xdbe \
-  --enable-xfixes \
-  --enable-xcursor \
-  --with-x
-make %{?_smp_mflags} 
-make DESTDIR=%{static_lib_buildroot} install
-popd
-%endif
 
 %{cmake} -G"Unix Makefiles" \
   -DBUILD_STATIC=off \
-  -DCMAKE_INSTALL_PREFIX=%{_prefix} \
-  -DFLTK_LIBRARIES="%{static_lib_buildroot}%{_libdir}/libfltk.a;%{static_lib_buildroot}%{_libdir}/libfltk_images.a;-lpng;-ldl" \
-  -DFLTK_INCLUDE_DIR=%{static_lib_buildroot}%{_includedir}
+  -DCMAKE_INSTALL_PREFIX=%{_prefix}
 make %{?_smp_mflags}
 
 pushd unix/xserver
@@ -230,7 +160,7 @@ autoreconf -fiv
         --with-fontdir=%{_datadir}/X11/fonts \
         --with-xkb-output=%{_localstatedir}/lib/xkb \
         --enable-install-libxf86config \
-        --enable-glx --disable-dri --enable-dri2 \
+        --enable-glx --disable-dri --enable-dri2 --disable-dri3 \
         --disable-wayland \
         --disable-present \
         --disable-config-dbus \
@@ -250,33 +180,7 @@ pushd media
 make
 popd
 
-# Build Java applet
-pushd java
-%{cmake} \
-%if !%{_self_signed}
-	-DJAVA_KEYSTORE=%{_keystore} \
-	-DJAVA_KEYSTORE_TYPE=%{_keystore_type} \
-	-DJAVA_KEY_ALIAS=%{_key_alias} \
-	-DJAVA_STOREPASS=":env STOREPASS" \
-	-DJAVA_KEYPASS=":env KEYPASS" \
-	-DJAVA_TSA_URL=http://timestamp.geotrust.com/tsa .
-%endif
-
-make
-popd
-
 %install
-%if %{_bootstrap}
-for l in fltk; do
-pushd $l-*
-make install DESTDIR=$RPM_BUILD_ROOT/opt/%{name}/%{scl_name}
-popd
-done
-find %{buildroot}/opt/%{name}/%{scl_name}%{_prefix} -type f -name "*.la" -delete
-find %{buildroot}/opt/%{name}/%{scl_name}%{_prefix} -type f -name "*.pc" -exec sed -i -e "s|libdir=%{_libdir}|libdir=/opt/%{name}/%{scl_name}%{_libdir}|" {} \;
-find %{buildroot}/opt/%{name}/%{scl_name}%{_prefix} -type f -name "*.pc" -exec sed -i -e "s|prefix=%{_prefix}|prefix=/opt/%{name}/%{scl_name}%{_prefix}|" {} \;
-%endif
-
 make install DESTDIR=$RPM_BUILD_ROOT
 
 pushd unix/xserver/hw/vnc
@@ -290,13 +194,6 @@ rm -rf %{buildroot}%{_initrddir}
 
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
 install -m644 %{SOURCE2} $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/vncservers
-
-# Install Java applet
-pushd java
-mkdir -p $RPM_BUILD_ROOT%{_datadir}/vnc/classes
-install -m755 VncViewer.jar $RPM_BUILD_ROOT%{_datadir}/vnc/classes
-install -m644 com/tigervnc/vncviewer/index.vnc $RPM_BUILD_ROOT%{_datadir}/vnc/classes
-popd
 
 %find_lang %{name} %{name}.lang
 
@@ -370,11 +267,6 @@ fi
 %config %{_sysconfdir}/X11/xorg.conf.d/10-libvnc.conf
 %endif
 
-%files server-applet
-%defattr(-,root,root,-)
-%doc java/com/tigervnc/vncviewer/README
-%{_datadir}/vnc/classes/*
-
 %files license
 %doc %{_docdir}/%{name}-%{version}/LICENCE.TXT
 
@@ -382,16 +274,20 @@ fi
 %defattr(-,root,root,-)
 %{_datadir}/icons/hicolor/*/apps/*
 
-%if %{_bootstrap}
-%files static-devel
-%defattr(-,root,root,-)
-/opt/%{name}/%{scl_name}%{_bindir}/*
-/opt/%{name}/%{scl_name}%{_includedir}/*
-/opt/%{name}/%{scl_name}%{_libdir}/*
-/opt/%{name}/%{scl_name}%{_datadir}/*
-%endif
-
 %changelog
+* Mon Jan 14 2019 Pierre Ossman <ossman@cendio.se> 1.9.80-4
+- Use system FLTK for build
+- Add libXrandr-devel as a dependency so x0vncserver gets resize support.
+
+* Sun Dec 09 2018 Mark Mielke <mmielke@ciena.com> 1.9.80-3
+- Update package dependencies to require version alignment between packages.
+
+* Sun Nov 26 2018 Brian P. Hinz <bphinz@users.sourceforge.net> 1.9.80-2
+- Bumped Xorg version to 1.20
+
+* Sun Jul 22 2018 Brian P. Hinz <bphinz@users.sourceforge.net> 1.9.80-1
+- Updated fltk to latest version
+
 * Thu Dec 24 2015 Brian P. Hinz <bphinz@users.sourceforge.net> 1.6.80-1
 - Adapted from RedHat EL7 Spec
 

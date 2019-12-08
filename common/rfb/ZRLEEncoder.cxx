@@ -19,7 +19,6 @@
 #include <rdr/OutStream.h>
 #include <rfb/Exception.h>
 #include <rfb/encodings.h>
-#include <rfb/ConnParams.h>
 #include <rfb/Palette.h>
 #include <rfb/SConnection.h>
 #include <rfb/ZRLEEncoder.h>
@@ -43,7 +42,7 @@ ZRLEEncoder::~ZRLEEncoder()
 
 bool ZRLEEncoder::isSupported()
 {
-  return conn->cp.supportsEncoding(encodingZRLE);
+  return conn->client.supportsEncoding(encodingZRLE);
 }
 
 void ZRLEEncoder::writeRect(const PixelBuffer* pb, const Palette& palette)
@@ -223,7 +222,7 @@ void ZRLEEncoder::writePixels(const rdr::U8* buffer, const PixelFormat& pf,
   pf.bufferFromPixel(pixBuf, maxPixel);
 
   if ((pf.bpp != 32) || ((pixBuf[0] != 0) && (pixBuf[3] != 0))) {
-    zos.writeBytes(buffer, count * pf.bpp/8);
+    zos.writeBytes(buffer, count * (pf.bpp/8));
     return;
   }
 

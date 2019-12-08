@@ -1,5 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
- * Copyright 2011-2017 Pierre Ossman for Cendio AB
+ * Copyright 2011-2019 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,14 +16,17 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  * USA.
  */
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
 #include <rfb/Exception.h>
+#include <rfb/clipboardTypes.h>
 #include <rfb/fenceTypes.h>
 #include <rfb/CMsgReader.h>
 #include <rfb/CMsgWriter.h>
 #include <rfb/CSecurity.h>
+#include <rfb/Decoder.h>
 #include <rfb/Security.h>
 #include <rfb/SecurityClient.h>
 #include <rfb/CConnection.h>
@@ -39,21 +42,32 @@ using namespace rfb;
 static LogWriter vlog("CConnection");
 
 CConnection::CConnection()
-  : csecurity(0), is(0), os(0), reader_(0), writer_(0),
+  : csecurity(0),
+    supportsLocalCursor(false), supportsDesktopResize(false),
+    supportsLEDState(false),
+    is(0), os(0), reader_(0), writer_(0),
     shared(false),
-    state_(RFBSTATE_UNINITIALISED), useProtocol3_3(false),
-    framebuffer(NULL), decoder(this)
+    state_(RFBSTATE_UNINITIALISED),
+    pendingPFChange(false), preferredEncoding(encodingTight),
+    compressLevel(2), qualityLevel(-1),
+    formatChange(false), encodingChange(false),
+    firstUpdate(true), pendingUpdate(false), continuousUpdates(false),
+    forceNonincremental(true),
+    framebuffer(NULL), decoder(this),
+    serverClipboard(NULL), hasLocalClipboard(false)
 {
 }
 
 CConnection::~CConnection()
 {
   setFramebuffer(NULL);
-  if (csecurity) csecurity->destroy();
+  if (csecurity)
+    delete csecurity;
   delete reader_;
   reader_ = 0;
   delete writer_;
   writer_ = 0;
+  strFree(serverClipboard);
 }
 
 void CConnection::setStreams(rdr::InStream* is_, rdr::OutStream* os_)
@@ -65,6 +79,11 @@ void CConnection::setStreams(rdr::InStream* is_, rdr::OutStream* os_)
 void CConnection::setFramebuffer(ModifiablePixelBuffer* fb)
 {
   decoder.flush();
+
+  if (fb) {
+    assert(fb->width() == server.width());
+    assert(fb->height() == server.height());
+  }
 
   if ((framebuffer != NULL) && (fb != NULL)) {
     Rect rect;
@@ -127,35 +146,51 @@ void CConnection::processMsg()
 
 void CConnection::processVersionMsg()
 {
+  char verStr[27]; // FIXME: gcc has some bug in format-overflow
+  int majorVersion;
+  int minorVersion;
+
   vlog.debug("reading protocol version");
-  bool done;
-  if (!cp.readVersion(is, &done)) {
+
+  if (!is->checkNoWait(12))
+    return;
+
+  is->readBytes(verStr, 12);
+  verStr[12] = '\0';
+
+  if (sscanf(verStr, "RFB %03d.%03d\n",
+             &majorVersion, &minorVersion) != 2) {
     state_ = RFBSTATE_INVALID;
     throw Exception("reading version failed: not an RFB server?");
   }
-  if (!done) return;
+
+  server.setVersion(majorVersion, minorVersion);
 
   vlog.info("Server supports RFB protocol version %d.%d",
-            cp.majorVersion, cp.minorVersion);
+            server.majorVersion, server.minorVersion);
 
   // The only official RFB protocol versions are currently 3.3, 3.7 and 3.8
-  if (cp.beforeVersion(3,3)) {
+  if (server.beforeVersion(3,3)) {
     vlog.error("Server gave unsupported RFB protocol version %d.%d",
-               cp.majorVersion, cp.minorVersion);
+               server.majorVersion, server.minorVersion);
     state_ = RFBSTATE_INVALID;
     throw Exception("Server gave unsupported RFB protocol version %d.%d",
-                    cp.majorVersion, cp.minorVersion);
-  } else if (useProtocol3_3 || cp.beforeVersion(3,7)) {
-    cp.setVersion(3,3);
-  } else if (cp.afterVersion(3,8)) {
-    cp.setVersion(3,8);
+                    server.majorVersion, server.minorVersion);
+  } else if (server.beforeVersion(3,7)) {
+    server.setVersion(3,3);
+  } else if (server.afterVersion(3,8)) {
+    server.setVersion(3,8);
   }
 
-  cp.writeVersion(os);
+  sprintf(verStr, "RFB %03d.%03d\n",
+          server.majorVersion, server.minorVersion);
+  os->writeBytes(verStr, 12);
+  os->flush();
+
   state_ = RFBSTATE_SECURITY_TYPES;
 
   vlog.info("Using RFB protocol version %d.%d",
-            cp.majorVersion, cp.minorVersion);
+            server.majorVersion, server.minorVersion);
 }
 
 
@@ -168,7 +203,7 @@ void CConnection::processSecurityTypesMsg()
   std::list<rdr::U8> secTypes;
   secTypes = security.GetEnabledSecTypes();
 
-  if (cp.isVersion(3,3)) {
+  if (server.isVersion(3,3)) {
 
     // legacy 3.3 server may only offer "vnc authentication" or "none"
 
@@ -234,14 +269,14 @@ void CConnection::processSecurityTypesMsg()
   }
 
   state_ = RFBSTATE_SECURITY;
-  csecurity = security.GetCSecurity(secType);
+  csecurity = security.GetCSecurity(this, secType);
   processSecurityMsg();
 }
 
 void CConnection::processSecurityMsg()
 {
   vlog.debug("processing security message");
-  if (csecurity->processMsg(this)) {
+  if (csecurity->processMsg()) {
     state_ = RFBSTATE_SECURITY_RESULT;
     processSecurityResultMsg();
   }
@@ -251,7 +286,7 @@ void CConnection::processSecurityResultMsg()
 {
   vlog.debug("processing security result message");
   int result;
-  if (cp.beforeVersion(3,8) && csecurity->getType() == secTypeNone) {
+  if (server.beforeVersion(3,8) && csecurity->getType() == secTypeNone) {
     result = secResultOK;
   } else {
     if (!is->checkNoWait(1)) return;
@@ -271,7 +306,7 @@ void CConnection::processSecurityResultMsg()
     throw Exception("Unknown security result from server");
   }
   state_ = RFBSTATE_INVALID;
-  if (cp.beforeVersion(3,8))
+  if (server.beforeVersion(3,8))
     throw AuthFailureException();
   CharArray reason(is->readString());
   throw AuthFailureException(reason.buf);
@@ -295,7 +330,7 @@ void CConnection::securityCompleted()
 {
   state_ = RFBSTATE_INITIALISATION;
   reader_ = new CMsgReader(this, is);
-  writer_ = new CMsgWriter(&cp, os);
+  writer_ = new CMsgWriter(&server, os);
   vlog.debug("Authentication success!");
   authSuccess();
   writer_->writeClientInit(shared);
@@ -306,6 +341,16 @@ void CConnection::setDesktopSize(int w, int h)
   decoder.flush();
 
   CMsgHandler::setDesktopSize(w,h);
+
+  if (continuousUpdates)
+    writer()->writeEnableContinuousUpdates(true, 0, 0,
+                                           server.width(),
+                                           server.height());
+
+  resizeFramebuffer();
+  assert(framebuffer != NULL);
+  assert(framebuffer->width() == server.width());
+  assert(framebuffer->height() == server.height());
 }
 
 void CConnection::setExtendedDesktopSize(unsigned reason,
@@ -316,6 +361,59 @@ void CConnection::setExtendedDesktopSize(unsigned reason,
   decoder.flush();
 
   CMsgHandler::setExtendedDesktopSize(reason, result, w, h, layout);
+
+  if (continuousUpdates)
+    writer()->writeEnableContinuousUpdates(true, 0, 0,
+                                           server.width(),
+                                           server.height());
+
+  resizeFramebuffer();
+  assert(framebuffer != NULL);
+  assert(framebuffer->width() == server.width());
+  assert(framebuffer->height() == server.height());
+}
+
+void CConnection::endOfContinuousUpdates()
+{
+  CMsgHandler::endOfContinuousUpdates();
+
+  // We've gotten the marker for a format change, so make the pending
+  // one active
+  if (pendingPFChange) {
+    server.setPF(pendingPF);
+    pendingPFChange = false;
+
+    // We might have another change pending
+    if (formatChange)
+      requestNewUpdate();
+  }
+}
+
+void CConnection::serverInit(int width, int height,
+                             const PixelFormat& pf,
+                             const char* name)
+{
+  CMsgHandler::serverInit(width, height, pf, name);
+
+  state_ = RFBSTATE_NORMAL;
+  vlog.debug("initialisation done");
+
+  initDone();
+  assert(framebuffer != NULL);
+  assert(framebuffer->width() == server.width());
+  assert(framebuffer->height() == server.height());
+
+  // We want to make sure we call SetEncodings at least once
+  encodingChange = true;
+
+  requestNewUpdate();
+
+  // This initial update request is a bit of a corner case, so we need
+  // to help out setting the correct format here.
+  if (pendingPFChange) {
+    server.setPF(pendingPF);
+    pendingPFChange = false;
+  }
 }
 
 void CConnection::readAndDecodeRect(const Rect& r, int encoding,
@@ -328,6 +426,13 @@ void CConnection::readAndDecodeRect(const Rect& r, int encoding,
 void CConnection::framebufferUpdateStart()
 {
   CMsgHandler::framebufferUpdateStart();
+
+  assert(framebuffer != NULL);
+
+  // Note: This might not be true if continuous updates are supported
+  pendingUpdate = false;
+
+  requestNewUpdate();
 }
 
 void CConnection::framebufferUpdateEnd()
@@ -335,6 +440,25 @@ void CConnection::framebufferUpdateEnd()
   decoder.flush();
 
   CMsgHandler::framebufferUpdateEnd();
+
+  // A format change has been scheduled and we are now past the update
+  // with the old format. Time to active the new one.
+  if (pendingPFChange && !continuousUpdates) {
+    server.setPF(pendingPF);
+    pendingPFChange = false;
+  }
+
+  if (firstUpdate) {
+    if (server.supportsContinuousUpdates) {
+      vlog.info("Enabling continuous updates");
+      continuousUpdates = true;
+      writer()->writeEnableContinuousUpdates(true, 0, 0,
+                                             server.width(),
+                                             server.height());
+    }
+
+    firstUpdate = false;
+  }
 }
 
 void CConnection::dataRect(const Rect& r, int encoding)
@@ -342,14 +466,190 @@ void CConnection::dataRect(const Rect& r, int encoding)
   decoder.decodeRect(r, encoding, framebuffer);
 }
 
+void CConnection::serverCutText(const char* str)
+{
+  hasLocalClipboard = false;
+
+  strFree(serverClipboard);
+  serverClipboard = NULL;
+
+  serverClipboard = latin1ToUTF8(str);
+
+  handleClipboardAnnounce(true);
+}
+
+void CConnection::handleClipboardCaps(rdr::U32 flags,
+                                      const rdr::U32* lengths)
+{
+  rdr::U32 sizes[] = { 0 };
+
+  CMsgHandler::handleClipboardCaps(flags, lengths);
+
+  writer()->writeClipboardCaps(rfb::clipboardUTF8 |
+                               rfb::clipboardRequest |
+                               rfb::clipboardPeek |
+                               rfb::clipboardNotify |
+                               rfb::clipboardProvide,
+                               sizes);
+}
+
+void CConnection::handleClipboardRequest(rdr::U32 flags)
+{
+  if (!(flags & rfb::clipboardUTF8))
+    return;
+  if (!hasLocalClipboard)
+    return;
+  handleClipboardRequest();
+}
+
+void CConnection::handleClipboardPeek(rdr::U32 flags)
+{
+  if (!hasLocalClipboard)
+    return;
+  if (server.clipboardFlags() & rfb::clipboardNotify)
+    writer()->writeClipboardNotify(rfb::clipboardUTF8);
+}
+
+void CConnection::handleClipboardNotify(rdr::U32 flags)
+{
+  strFree(serverClipboard);
+  serverClipboard = NULL;
+
+  if (flags & rfb::clipboardUTF8) {
+    hasLocalClipboard = false;
+    handleClipboardAnnounce(true);
+  } else {
+    handleClipboardAnnounce(false);
+  }
+}
+
+void CConnection::handleClipboardProvide(rdr::U32 flags,
+                                         const size_t* lengths,
+                                         const rdr::U8* const* data)
+{
+  if (!(flags & rfb::clipboardUTF8))
+    return;
+
+  strFree(serverClipboard);
+  serverClipboard = NULL;
+
+  serverClipboard = convertLF((const char*)data[0], lengths[0]);
+
+  // FIXME: Should probably verify that this data was actually requested
+  handleClipboardData(serverClipboard);
+}
+
 void CConnection::authSuccess()
 {
 }
 
-void CConnection::serverInit()
+void CConnection::initDone()
 {
-  state_ = RFBSTATE_NORMAL;
-  vlog.debug("initialisation done");
+}
+
+void CConnection::resizeFramebuffer()
+{
+  assert(false);
+}
+
+void CConnection::handleClipboardRequest()
+{
+}
+
+void CConnection::handleClipboardAnnounce(bool available)
+{
+}
+
+void CConnection::handleClipboardData(const char* data)
+{
+}
+
+void CConnection::requestClipboard()
+{
+  if (serverClipboard != NULL) {
+    handleClipboardData(serverClipboard);
+    return;
+  }
+
+  if (server.clipboardFlags() & rfb::clipboardRequest)
+    writer()->writeClipboardRequest(rfb::clipboardUTF8);
+}
+
+void CConnection::announceClipboard(bool available)
+{
+  hasLocalClipboard = available;
+
+  if (server.clipboardFlags() & rfb::clipboardNotify)
+    writer()->writeClipboardNotify(available ? rfb::clipboardUTF8 : 0);
+  else {
+    if (available)
+      handleClipboardRequest();
+  }
+}
+
+void CConnection::sendClipboardData(const char* data)
+{
+  if (server.clipboardFlags() & rfb::clipboardProvide) {
+    CharArray filtered(convertCRLF(data));
+    size_t sizes[1] = { strlen(filtered.buf) + 1 };
+    const rdr::U8* data[1] = { (const rdr::U8*)filtered.buf };
+    writer()->writeClipboardProvide(rfb::clipboardUTF8, sizes, data);
+  } else {
+    CharArray latin1(utf8ToLatin1(data));
+
+    writer()->writeClientCutText(latin1.buf);
+  }
+}
+
+void CConnection::refreshFramebuffer()
+{
+  forceNonincremental = true;
+
+  // Without continuous updates we have to make sure we only have a
+  // single update in flight, so we'll have to wait to do the refresh
+  if (continuousUpdates)
+    requestNewUpdate();
+}
+
+void CConnection::setPreferredEncoding(int encoding)
+{
+  if (preferredEncoding == encoding)
+    return;
+
+  preferredEncoding = encoding;
+  encodingChange = true;
+}
+
+int CConnection::getPreferredEncoding()
+{
+  return preferredEncoding;
+}
+
+void CConnection::setCompressLevel(int level)
+{
+  if (compressLevel == level)
+    return;
+
+  compressLevel = level;
+  encodingChange = true;
+}
+
+void CConnection::setQualityLevel(int level)
+{
+  if (qualityLevel == level)
+    return;
+
+  qualityLevel = level;
+  encodingChange = true;
+}
+
+void CConnection::setPF(const PixelFormat& pf)
+{
+  if (server.pf().equal(pf) && !formatChange)
+    return;
+
+  nextPF = pf;
+  formatChange = true;
 }
 
 void CConnection::fence(rdr::U32 flags, unsigned len, const char data[])
@@ -363,4 +663,99 @@ void CConnection::fence(rdr::U32 flags, unsigned len, const char data[])
   flags = 0;
 
   writer()->writeFence(flags, len, data);
+}
+
+// requestNewUpdate() requests an update from the server, having set the
+// format and encoding appropriately.
+void CConnection::requestNewUpdate()
+{
+  if (formatChange && !pendingPFChange) {
+    /* Catch incorrect requestNewUpdate calls */
+    assert(!pendingUpdate || continuousUpdates);
+
+    // We have to make sure we switch the internal format at a safe
+    // time. For continuous updates we temporarily disable updates and
+    // look for a EndOfContinuousUpdates message to see when to switch.
+    // For classical updates we just got a new update right before this
+    // function was called, so we need to make sure we finish that
+    // update before we can switch.
+
+    pendingPFChange = true;
+    pendingPF = nextPF;
+
+    if (continuousUpdates)
+      writer()->writeEnableContinuousUpdates(false, 0, 0, 0, 0);
+
+    writer()->writeSetPixelFormat(pendingPF);
+
+    if (continuousUpdates)
+      writer()->writeEnableContinuousUpdates(true, 0, 0,
+                                             server.width(),
+                                             server.height());
+
+    formatChange = false;
+  }
+
+  if (encodingChange) {
+    updateEncodings();
+    encodingChange = false;
+  }
+
+  if (forceNonincremental || !continuousUpdates) {
+    pendingUpdate = true;
+    writer()->writeFramebufferUpdateRequest(Rect(0, 0,
+                                                 server.width(),
+                                                 server.height()),
+                                            !forceNonincremental);
+  }
+
+  forceNonincremental = false;
+}
+
+// Ask for encodings based on which decoders are supported.  Assumes higher
+// encoding numbers are more desirable.
+
+void CConnection::updateEncodings()
+{
+  std::list<rdr::U32> encodings;
+
+  if (supportsLocalCursor) {
+    encodings.push_back(pseudoEncodingCursorWithAlpha);
+    encodings.push_back(pseudoEncodingVMwareCursor);
+    encodings.push_back(pseudoEncodingCursor);
+    encodings.push_back(pseudoEncodingXCursor);
+  }
+  if (supportsDesktopResize) {
+    encodings.push_back(pseudoEncodingDesktopSize);
+    encodings.push_back(pseudoEncodingExtendedDesktopSize);
+  }
+  if (supportsLEDState) {
+    encodings.push_back(pseudoEncodingLEDState);
+    encodings.push_back(pseudoEncodingVMwareLEDState);
+  }
+
+  encodings.push_back(pseudoEncodingDesktopName);
+  encodings.push_back(pseudoEncodingLastRect);
+  encodings.push_back(pseudoEncodingExtendedClipboard);
+  encodings.push_back(pseudoEncodingContinuousUpdates);
+  encodings.push_back(pseudoEncodingFence);
+  encodings.push_back(pseudoEncodingQEMUKeyEvent);
+
+  if (Decoder::supported(preferredEncoding)) {
+    encodings.push_back(preferredEncoding);
+  }
+
+  encodings.push_back(encodingCopyRect);
+
+  for (int i = encodingMax; i >= 0; i--) {
+    if ((i != preferredEncoding) && Decoder::supported(i))
+      encodings.push_back(i);
+  }
+
+  if (compressLevel >= 0 && compressLevel <= 9)
+      encodings.push_back(pseudoEncodingCompressLevel0 + compressLevel);
+  if (qualityLevel >= 0 && qualityLevel <= 9)
+      encodings.push_back(pseudoEncodingQualityLevel0 + qualityLevel);
+
+  writer()->writeSetEncodings(encodings);
 }

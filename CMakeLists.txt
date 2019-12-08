@@ -2,7 +2,7 @@
 # Setup
 #
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.11)
 if(POLICY CMP0022)
   cmake_policy(SET CMP0022 OLD)
 endif()
@@ -21,10 +21,10 @@ include(CheckCSourceRuns)
 include(CMakeMacroLibtoolFile)
 
 project(tigervnc)
-set(VERSION 1.9.0)
+set(VERSION 1.10.0)
 
 # The RC version must always be four comma-separated numbers
-set(RCVERSION 1,9,0,0)
+set(RCVERSION 1,10,0,0)
 
 # Installation paths
 set(BIN_DIR "${CMAKE_INSTALL_PREFIX}/bin")
@@ -43,9 +43,7 @@ if(MSVC)
 endif()
 
 if(NOT BUILD_TIMESTAMP)
-  set(BUILD_TIMESTAMP "")
-  execute_process(COMMAND "date" "+%Y-%m-%d %H:%M" OUTPUT_VARIABLE BUILD_TIMESTAMP)
-  string(REGEX REPLACE "\n" "" BUILD_TIMESTAMP ${BUILD_TIMESTAMP})
+  STRING(TIMESTAMP BUILD_TIMESTAMP "%Y-%m-%d %H:%M" UTC)
 endif()
 
 # Default to optimised builds instead of debug ones. Our code has no bugs ;)
@@ -76,8 +74,8 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wformat=2")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wformat=2")
 # Make sure we catch these issues whilst developing
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror -Werror=vla")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Werror=vla")
 ENDIF()
 
 option(ENABLE_ASAN "Enable address sanitizer support" OFF)

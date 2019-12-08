@@ -142,6 +142,11 @@ GnuTLS priority string that controls the TLS session’s handshake algorithms.
 See the GnuTLS manual for possible values. Default is \fBNORMAL\fP.
 .
 .TP
+.B \-UseBlacklist
+Temporarily reject connections from a host if it repeatedly fails to
+authenticate. Default is on.
+.
+.TP
 .B \-BlacklistThreshold \fIcount\fP
 The number of unauthenticated connection attempts allowed from any individual
 host before that host is black-listed.  Default is 5.
@@ -160,6 +165,11 @@ connections. Default is off.
 .B \-QueryConnectTimeout \fIseconds\fP
 Number of seconds to show the Accept Connection dialog before rejecting the
 connection.  Default is \fB10\fP.
+.
+.TP
+.B \-localhost
+Only allow connections from the same machine. Useful if you use SSH and want to
+stop non-SSH connections from any other hosts.
 .
 .TP
 .B \-AlwaysShared
@@ -185,6 +195,10 @@ Accept key press and release events from clients. Default is on.
 .TP
 .B \-AcceptPointerEvents
 Accept pointer press and release events from clients. Default is on.
+.
+.TP
+.B \-AcceptSetDesktopSize
+Accept requests to resize the size of the desktop. Default is on.
 .
 .TP
 .B \-RemapKeys \fImapping
@@ -302,7 +316,7 @@ Currently unused.
 .BR Xvnc (1),
 .BR vncpasswd (1),
 .br
-http://www.tigervnc.org/
+https://www.tigervnc.org/
 
 .SH AUTHOR
 Constantin Kaplinsky and others.

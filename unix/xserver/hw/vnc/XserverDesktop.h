@@ -1,5 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
- * Copyright 2009-2015 Pierre Ossman for Cendio AB
+ * Copyright 2009-2019 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,11 +32,9 @@
 #include <stdint.h>
 
 #include <rfb/SDesktop.h>
-#include <rfb/HTTPServer.h>
 #include <rfb/PixelBuffer.h>
 #include <rfb/Configuration.h>
-#include <rfb/VNCServerST.h>
-#include <rdr/SubstitutingInStream.h>
+#include <rfb/Timer.h>
 #include <unixcommon.h>
 #include "Input.h"
 
@@ -47,14 +45,11 @@ namespace rfb {
 namespace network { class SocketListener; class Socket; class SocketServer; }
 
 class XserverDesktop : public rfb::SDesktop, public rfb::FullFramePixelBuffer,
-                       public rdr::Substitutor,
-                       public rfb::VNCServerST::QueryConnectionHandler,
                        public rfb::Timer::Callback {
 public:
 
   XserverDesktop(int screenIndex,
                  std::list<network::SocketListener*> listeners_,
-                 std::list<network::SocketListener*> httpListeners_,
                  const char* name, const rfb::PixelFormat &pf,
                  int width, int height, void* fbptr, int stride);
   virtual ~XserverDesktop();
@@ -64,9 +59,11 @@ public:
   void unblockUpdates();
   void setFramebuffer(int w, int h, void* fbptr, int stride);
   void refreshScreenLayout();
+  void requestClipboard();
+  void announceClipboard(bool available);
+  void sendClipboardData(const char* data);
   void bell();
   void setLEDState(unsigned int state);
-  void serverCutText(const char* str, int len);
   void setDesktopName(const char* name);
   void setCursor(int width, int height, int hotX, int hotY,
                  const unsigned char *rgbaData);
@@ -90,22 +87,21 @@ public:
                          const char* rejectMsg=0);
 
   // rfb::SDesktop callbacks
+  virtual void start(rfb::VNCServer* vs);
+  virtual void stop();
+  virtual void terminate();
+  virtual void queryConnection(network::Socket* sock,
+                               const char* userName);
   virtual void pointerEvent(const rfb::Point& pos, int buttonMask);
   virtual void keyEvent(rdr::U32 keysym, rdr::U32 keycode, bool down);
-  virtual void clientCutText(const char* str, int len);
   virtual unsigned int setScreenLayout(int fb_width, int fb_height,
                                        const rfb::ScreenSet& layout);
+  virtual void handleClipboardRequest();
+  virtual void handleClipboardAnnounce(bool available);
+  virtual void handleClipboardData(const char* data);
 
   // rfb::PixelBuffer callbacks
   virtual void grabRegion(const rfb::Region& r);
-
-  // rdr::Substitutor callback
-  virtual char* substitute(const char* varName);
-
-  // rfb::VNCServerST::QueryConnectionHandler callback
-  virtual rfb::VNCServerST::queryResult queryConnection(network::Socket* sock,
-                                                        const char* userName,
-                                                        char** reason);
 
 protected:
   bool handleListenerEvent(int fd,
@@ -120,10 +116,8 @@ protected:
 private:
 
   int screenIndex;
-  rfb::VNCServerST* server;
-  rfb::HTTPServer* httpServer;
+  rfb::VNCServer* server;
   std::list<network::SocketListener*> listeners;
-  std::list<network::SocketListener*> httpListeners;
   bool directFbptr;
 
   uint32_t queryConnectId;

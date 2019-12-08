@@ -1,4 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
+ * Copyright 2009-2019 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,13 +23,16 @@
 #ifndef __RFB_VNCSERVER_H__
 #define __RFB_VNCSERVER_H__
 
+#include <network/Socket.h>
+
 #include <rfb/UpdateTracker.h>
 #include <rfb/SSecurity.h>
 #include <rfb/ScreenSet.h>
 
 namespace rfb {
 
-  class VNCServer : public UpdateTracker {
+  class VNCServer : public UpdateTracker,
+                    public network::SocketServer {
   public:
     // blockUpdates()/unblockUpdates() tells the server that the pixel buffer
     // is currently in flux and may not be accessed. The attributes of the
@@ -50,18 +54,42 @@ namespace rfb {
     virtual void setScreenLayout(const ScreenSet& layout) = 0;
 
     // getPixelBuffer() returns a pointer to the PixelBuffer object.
-    virtual PixelBuffer* getPixelBuffer() const = 0;
+    virtual const PixelBuffer* getPixelBuffer() const = 0;
 
-    // serverCutText() tells the server that the cut text has changed.  This
-    // will normally be sent to all clients.
-    virtual void serverCutText(const char* str, int len) = 0;
+    // requestClipboard() will result in a request to a client to
+    // transfer its clipboard data. A call to
+    // SDesktop::handleClipboardData() will be made once the data is
+    // available.
+    virtual void requestClipboard() = 0;
+
+    // announceClipboard() informs all clients of changes to the
+    // clipboard on the server. A client may later request the
+    // clipboard data via SDesktop::handleClipboardRequest().
+    virtual void announceClipboard(bool available) = 0;
+
+    // sendClipboardData() transfers the clipboard data to a client
+    // and should be called whenever a client has requested the
+    // clipboard via SDesktop::handleClipboardRequest().
+    virtual void sendClipboardData(const char* data) = 0;
 
     // bell() tells the server that it should make all clients make a bell sound.
     virtual void bell() = 0;
 
+    // approveConnection() is called some time after
+    // SDesktop::queryConnection() has been called, to accept or reject
+    // the connection.  The accept argument should be true for
+    // acceptance, or false for rejection, in which case a string
+    // reason may also be given.
+    virtual void approveConnection(network::Socket* sock, bool accept,
+                                   const char* reason = NULL) = 0;
+
     // - Close all currently-connected clients, by calling
     //   their close() method with the supplied reason.
     virtual void closeClients(const char* reason) = 0;
+
+    // getConnection() gets the SConnection for a particular Socket.  If
+    // the Socket is not recognised then null is returned.
+    virtual SConnection* getConnection(network::Socket* sock) = 0;
 
     // setCursor() tells the server that the cursor has changed.  The
     // cursorData argument contains width*height rgba quadruplets with
