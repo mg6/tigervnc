@@ -64,7 +64,8 @@ static const struct TightJPEGConfiguration conf[10] = {
 
 
 TightJPEGEncoder::TightJPEGEncoder(SConnection* conn) :
-  Encoder(conn, encodingTight, (EncoderFlags)(EncoderUseNativePF | EncoderLossy), -1),
+  Encoder(conn, encodingTight,
+          (EncoderFlags)(EncoderUseNativePF | EncoderLossy), -1, 9),
   qualityLevel(-1), fineQuality(-1), fineSubsampling(subsampleUndefined)
 {
 }
@@ -75,15 +76,15 @@ TightJPEGEncoder::~TightJPEGEncoder()
 
 bool TightJPEGEncoder::isSupported()
 {
-  if (!conn->cp.supportsEncoding(encodingTight))
+  if (!conn->client.supportsEncoding(encodingTight))
     return false;
 
   // Any one of these indicates support for JPEG
-  if (conn->cp.qualityLevel != -1)
+  if (conn->client.qualityLevel != -1)
     return true;
-  if (conn->cp.fineQualityLevel != -1)
+  if (conn->client.fineQualityLevel != -1)
     return true;
-  if (conn->cp.subsampling != -1)
+  if (conn->client.subsampling != -1)
     return true;
 
   // Tight support, but not JPEG
@@ -99,6 +100,11 @@ void TightJPEGEncoder::setFineQualityLevel(int quality, int subsampling)
 {
   fineQuality = quality;
   fineSubsampling = subsampling;
+}
+
+int TightJPEGEncoder::getQualityLevel()
+{
+  return qualityLevel;
 }
 
 void TightJPEGEncoder::writeRect(const PixelBuffer* pb, const Palette& palette)

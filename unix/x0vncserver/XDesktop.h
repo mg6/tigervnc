@@ -21,7 +21,7 @@
 #ifndef __XDESKTOP_H__
 #define __XDESKTOP_H__
 
-#include <rfb/VNCServerST.h>
+#include <rfb/SDesktop.h>
 #include <tx/TXWindow.h>
 #include <unixcommon.h>
 
@@ -30,13 +30,17 @@
 #include <X11/extensions/Xdamage.h>
 #endif
 
+#include <vncconfig/QueryConnectDialog.h>
+
 class Geometry;
 class XPixelBuffer;
 
 // number of XKb indicator leds to handle
 #define XDESKTOP_N_LEDS 3
 
-class XDesktop : public rfb::SDesktop, public TXGlobalEventHandler
+class XDesktop : public rfb::SDesktop,
+                 public TXGlobalEventHandler,
+                 public QueryResultCallback
 {
 public:
   XDesktop(Display* dpy_, Geometry *geometry);
@@ -45,22 +49,31 @@ public:
   // -=- SDesktop interface
   virtual void start(rfb::VNCServer* vs);
   virtual void stop();
+  virtual void terminate();
   bool isRunning();
+  virtual void queryConnection(network::Socket* sock,
+                               const char* userName);
   virtual void pointerEvent(const rfb::Point& pos, int buttonMask);
   KeyCode XkbKeysymToKeycode(Display* dpy, KeySym keysym);
   virtual void keyEvent(rdr::U32 keysym, rdr::U32 xtcode, bool down);
-  virtual void clientCutText(const char* str, int len);
+  virtual void clientCutText(const char* str);
   virtual unsigned int setScreenLayout(int fb_width, int fb_height,
                                        const rfb::ScreenSet& layout);
 
   // -=- TXGlobalEventHandler interface
   virtual bool handleGlobalEvent(XEvent* ev);
 
+  // -=- QueryResultCallback interface
+  virtual void queryApproved();
+  virtual void queryRejected();
+
 protected:
   Display* dpy;
   Geometry* geometry;
   XPixelBuffer* pb;
-  rfb::VNCServerST* server;
+  rfb::VNCServer* server;
+  QueryConnectDialog* queryConnectDialog;
+  network::Socket* queryConnectSock;
   int oldButtonMask;
   bool haveXtest;
   bool haveDamage;

@@ -18,6 +18,12 @@
  * USA.
  */
 
+#include <assert.h>
+#include <signal.h>
+#include <unistd.h>
+
+#include <rfb/LogWriter.h>
+
 #include <x0vncserver/XDesktop.h>
 
 #include <X11/XKBlib.h>
@@ -53,6 +59,10 @@ BoolParameter rawKeyboard("RawKeyboard",
                           "Send keyboard events straight through and "
                           "avoid mapping them to the current keyboard "
                           "layout", false);
+IntParameter queryConnectTimeout("QueryConnectTimeout",
+                                 "Number of seconds to show the Accept Connection dialog before "
+                                 "rejecting the connection",
+                                 10);
 
 static rfb::LogWriter vlog("XDesktop");
 
@@ -63,6 +73,7 @@ static const char * ledNames[XDESKTOP_N_LEDS] = {
 
 XDesktop::XDesktop(Display* dpy_, Geometry *geometry_)
   : dpy(dpy_), geometry(geometry_), pb(0), server(0),
+    queryConnectDialog(0), queryConnectSock(0),
     oldButtonMask(0), haveXtest(false), haveDamage(false),
     maxButtons(0), running(false), ledMasks(), ledState(0),
     codeMap(0), codeMapLen(0)
@@ -204,6 +215,8 @@ void XDesktop::poll() {
     unsigned int mask;
     XQueryPointer(dpy, DefaultRootWindow(dpy), &root, &child,
                   &x, &y, &wx, &wy, &mask);
+    x -= geometry->offsetLeft();
+    y -= geometry->offsetTop();
     server->setCursorPos(rfb::Point(x, y));
   }
 }
@@ -225,7 +238,7 @@ void XDesktop::start(VNCServer* vs) {
   pb = new XPixelBuffer(dpy, factory, geometry->getRect());
   vlog.info("Allocated %s", pb->getImage()->classDesc());
 
-  server = (VNCServerST *)vs;
+  server = vs;
   server->setPixelBuffer(pb, computeScreenLayout());
 
 #ifdef HAVE_XDAMAGE
@@ -252,6 +265,9 @@ void XDesktop::stop() {
     XDamageDestroy(dpy, damage);
 #endif
 
+  delete queryConnectDialog;
+  queryConnectDialog = 0;
+
   server->setPixelBuffer(0);
   server = 0;
 
@@ -259,8 +275,36 @@ void XDesktop::stop() {
   pb = 0;
 }
 
+void XDesktop::terminate() {
+  kill(getpid(), SIGTERM);
+}
+
 bool XDesktop::isRunning() {
   return running;
+}
+
+void XDesktop::queryConnection(network::Socket* sock,
+                               const char* userName)
+{
+  assert(isRunning());
+
+  if (queryConnectSock) {
+    server->approveConnection(sock, false, "Another connection is currently being queried.");
+    return;
+  }
+
+  if (!userName)
+    userName = "(anonymous)";
+
+  queryConnectSock = sock;
+
+  CharArray address(sock->getPeerAddress());
+  delete queryConnectDialog;
+  queryConnectDialog = new QueryConnectDialog(dpy, address.buf,
+                                              userName,
+                                              queryConnectTimeout,
+                                              this);
+  queryConnectDialog->map();
 }
 
 void XDesktop::pointerEvent(const Point& pos, int buttonMask) {
@@ -289,6 +333,7 @@ void XDesktop::pointerEvent(const Point& pos, int buttonMask) {
 KeyCode XDesktop::XkbKeysymToKeycode(Display* dpy, KeySym keysym) {
   XkbDescPtr xkb;
   XkbStateRec state;
+  unsigned int mods;
   unsigned keycode;
 
   xkb = XkbGetMap(dpy, XkbAllComponentsMask, XkbUseCoreKbd);
@@ -296,15 +341,15 @@ KeyCode XDesktop::XkbKeysymToKeycode(Display* dpy, KeySym keysym) {
     return 0;
 
   XkbGetState(dpy, XkbUseCoreKbd, &state);
+  // XkbStateFieldFromRec() doesn't work properly because
+  // state.lookup_mods isn't properly updated, so we do this manually
+  mods = XkbBuildCoreState(XkbStateMods(&state), state.group);
 
   for (keycode = xkb->min_key_code;
        keycode <= xkb->max_key_code;
        keycode++) {
     KeySym cursym;
-    unsigned int mods, out_mods;
-    // XkbStateFieldFromRec() doesn't work properly because
-    // state.lookup_mods isn't properly updated, so we do this manually
-    mods = XkbBuildCoreState(XkbStateMods(&state), state.group);
+    unsigned int out_mods;
     XkbTranslateKeyCode(xkb, keycode, mods, &out_mods, &cursym);
     if (cursym == keysym)
       break;
@@ -314,6 +359,11 @@ KeyCode XDesktop::XkbKeysymToKeycode(Display* dpy, KeySym keysym) {
     keycode = 0;
 
   XkbFreeKeyboard(xkb, XkbAllComponentsMask, True);
+
+  // Shift+Tab is usually ISO_Left_Tab, but RFB hides this fact. Do
+  // another attempt if we failed the initial lookup
+  if ((keycode == 0) && (keysym == XK_Tab) && (mods & ShiftMask))
+    return XkbKeysymToKeycode(dpy, XK_ISO_Left_Tab);
 
   return keycode;
 }
@@ -340,19 +390,23 @@ void XDesktop::keyEvent(rdr::U32 keysym, rdr::U32 xtcode, bool down) {
     }
   }
 
-  if (!keycode)
+  if (!keycode) {
+    vlog.error("Could not map key event to X11 key code");
     return;
+  }
 
   if (down)
     pressedKeys[keysym] = keycode;
   else
     pressedKeys.erase(keysym);
 
+  vlog.debug("%d %s", keycode, down ? "down" : "up");
+
   XTestFakeKeyEvent(dpy, keycode, down, CurrentTime);
 #endif
 }
 
-void XDesktop::clientCutText(const char* str, int len) {
+void XDesktop::clientCutText(const char* str) {
 }
 
 ScreenSet XDesktop::computeScreenLayout()
@@ -369,7 +423,26 @@ ScreenSet XDesktop::computeScreenLayout()
 
   layout = ::computeScreenLayout(&outputIdMap);
   XRRFreeScreenResources(res);
+
+  // Adjust the layout relative to the geometry
+  ScreenSet::iterator iter, iter_next;
+  Point offset(-geometry->offsetLeft(), -geometry->offsetTop());
+  for (iter = layout.begin();iter != layout.end();iter = iter_next) {
+    iter_next = iter; ++iter_next;
+    iter->dimensions = iter->dimensions.translate(offset);
+    if (iter->dimensions.enclosed_by(geometry->getRect()))
+        continue;
+    iter->dimensions = iter->dimensions.intersect(geometry->getRect());
+    if (iter->dimensions.is_empty()) {
+      layout.remove_screen(iter->id);
+    }
+  }
 #endif
+
+  // Make sure that we have at least one screen
+  if (layout.num_screens() == 0)
+    layout.add_screen(rfb::Screen(0, 0, 0, geometry->width(),
+                                  geometry->height(), 0));
 
   return layout;
 }
@@ -555,11 +628,14 @@ unsigned int XDesktop::setScreenLayout(int fb_width, int fb_height,
      VNCSConnectionST::setDesktopSize. Another ExtendedDesktopSize
      with reason=0 will be sent in response to the changes seen by the
      event handler. */
-  if (adjustedLayout != layout) {
+  if (adjustedLayout != layout)
     return rfb::resultInvalid;
-  } else {
-    return ret;
-  }
+
+  // Explicitly update the server state with the result as there
+  // can be corner cases where we don't get feedback from the X server
+  server->setScreenLayout(computeScreenLayout());
+
+  return ret;
 
 #else
   return rfb::resultProhibited;
@@ -596,6 +672,8 @@ bool XDesktop::handleGlobalEvent(XEvent* ev) {
 
     dev = (XDamageNotifyEvent*)ev;
     rect.setXYWH(dev->area.x, dev->area.y, dev->area.width, dev->area.height);
+    rect = rect.translate(Point(-geometry->offsetLeft(),
+                                -geometry->offsetTop()));
     server->add_changed(rect);
 
     return true;
@@ -669,6 +747,21 @@ bool XDesktop::handleGlobalEvent(XEvent* ev) {
   return false;
 }
 
+void XDesktop::queryApproved()
+{
+  assert(isRunning());
+  server->approveConnection(queryConnectSock, true, 0);
+  queryConnectSock = 0;
+}
+
+void XDesktop::queryRejected()
+{
+  assert(isRunning());
+  server->approveConnection(queryConnectSock, false,
+                            "Connection rejected by local user");
+  queryConnectSock = 0;
+}
+
 bool XDesktop::setCursor()
 {
   XFixesCursorImage *cim;
@@ -693,16 +786,15 @@ bool XDesktop::setCursor()
     for (int x = 0; x < cim->width; x++) {
       rdr::U8 alpha;
       rdr::U32 pixel = *pixels++;
-      rdr::U8 *in = (rdr::U8 *) &pixel;
 
-      alpha = in[3];
+      alpha = (pixel >> 24) & 0xff;
       if (alpha == 0)
         alpha = 1; // Avoid division by zero
 
-      *out++ = (unsigned)*in++ * 255/alpha;
-      *out++ = (unsigned)*in++ * 255/alpha;
-      *out++ = (unsigned)*in++ * 255/alpha;
-      *out++ = *in++;
+      *out++ = ((pixel >> 16) & 0xff) * 255/alpha;
+      *out++ = ((pixel >>  8) & 0xff) * 255/alpha;
+      *out++ = ((pixel >>  0) & 0xff) * 255/alpha;
+      *out++ = ((pixel >> 24) & 0xff);
     }
   }
 

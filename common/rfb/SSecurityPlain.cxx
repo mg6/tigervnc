@@ -41,7 +41,7 @@ StringParameter PasswordValidator::plainUsers
 
 bool PasswordValidator::validUser(const char* username)
 {
-  CharArray users(strDup(plainUsers.getValueStr())), user;
+  CharArray users(plainUsers.getValueStr()), user;
 
   while (users.buf) {
     strSplit(users.buf, ',', &user.buf, &users.buf);
@@ -60,7 +60,7 @@ bool PasswordValidator::validUser(const char* username)
   return false;
 }
 
-SSecurityPlain::SSecurityPlain()
+SSecurityPlain::SSecurityPlain(SConnection* sc) : SSecurity(sc)
 {
 #ifdef HAVE_PAM
   valid = new UnixPasswordValidator();
@@ -73,7 +73,7 @@ SSecurityPlain::SSecurityPlain()
   state = 0;
 }
 
-bool SSecurityPlain::processMsg(SConnection* sc)
+bool SSecurityPlain::processMsg()
 {
   rdr::InStream* is = sc->getInStream();
   char* pw;

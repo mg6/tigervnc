@@ -1,5 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
- * Copyright 2011-2015 Pierre Ossman for Cendio AB
+ * Copyright 2011-2019 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -73,10 +73,6 @@ struct CaseInsensitiveCompare {
 typedef std::set<std::string, CaseInsensitiveCompare> ParamSet;
 static ParamSet allowOverrideSet;
 
-rfb::StringParameter httpDir("httpd",
-                             "Directory containing files to serve via HTTP",
-                             "");
-rfb::IntParameter httpPort("httpPort", "TCP port to listen for HTTP",0);
 rfb::AliasParameter rfbwait("rfbwait", "Alias for ClientWaitTimeMillis",
                             &rfb::Server::clientWaitTimeMillis);
 rfb::IntParameter rfbport("rfbport", "TCP port to listen for RFB protocol",0);
@@ -177,14 +173,13 @@ void vncExtensionInit(void)
 
       if (!desktop[scr]) {
         std::list<network::SocketListener*> listeners;
-        std::list<network::SocketListener*> httpListeners;
         if (scr == 0 && vncInetdSock != -1) {
           if (network::isSocketListening(vncInetdSock))
           {
             listeners.push_back(new network::TcpListener(vncInetdSock));
             vlog.info("inetd wait");
           }
-        } else if (rfbunixpath.getValueStr()[0] != '\0') {
+        } else if (((const char*)rfbunixpath)[0] != '\0') {
           char path[PATH_MAX];
           int mode = (int)rfbunixmode;
 
@@ -192,7 +187,7 @@ void vncExtensionInit(void)
             strncpy(path, rfbunixpath, sizeof(path));
           else
             snprintf(path, sizeof(path), "%s.%d",
-                     rfbunixpath.getValueStr(), scr);
+                     (const char*)rfbunixpath, scr);
           path[sizeof(path)-1] = '\0';
 
           listeners.push_back(new network::UnixListener(path, mode));
@@ -214,21 +209,6 @@ void vncExtensionInit(void)
           vlog.info("Listening for VNC connections on %s interface(s), port %d",
                     localhostOnly ? "local" : (const char*)interface,
                     port);
-
-          CharArray httpDirStr(httpDir.getData());
-          if (httpDirStr.buf[0]) {
-            port = httpPort;
-            if (port == 0) port = 5800 + atoi(vncGetDisplay());
-            port += 1000 * scr;
-            if (localhostOnly)
-              network::createLocalTcpListeners(&httpListeners, port);
-            else
-              network::createTcpListeners(&httpListeners, addr, port);
-
-            vlog.info("Listening for HTTP connections on %s interface(s), port %d",
-                      localhostOnly ? "local" : (const char*)interface,
-                      port);
-          }
         }
 
         CharArray desktopNameStr(desktopName.getData());
@@ -237,7 +217,6 @@ void vncExtensionInit(void)
         vncSetGlueContext(scr);
         desktop[scr] = new XserverDesktop(scr,
                                           listeners,
-                                          httpListeners,
                                           desktopNameStr.buf,
                                           pf,
                                           vncGetScreenWidth(),
@@ -306,10 +285,22 @@ void vncUpdateDesktopName(void)
     desktop[scr]->setDesktopName(desktopName);
 }
 
-void vncServerCutText(const char *text, size_t len)
+void vncRequestClipboard(void)
 {
   for (int scr = 0; scr < vncGetScreenCount(); scr++)
-    desktop[scr]->serverCutText(text, len);
+    desktop[scr]->requestClipboard();
+}
+
+void vncAnnounceClipboard(int available)
+{
+  for (int scr = 0; scr < vncGetScreenCount(); scr++)
+    desktop[scr]->announceClipboard(available);
+}
+
+void vncSendClipboardData(const char* data)
+{
+  for (int scr = 0; scr < vncGetScreenCount(); scr++)
+    desktop[scr]->sendClipboardData(data);
 }
 
 int vncConnectClient(const char *addr)

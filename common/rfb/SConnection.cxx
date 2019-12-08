@@ -1,5 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
- * Copyright 2011 Pierre Ossman for Cendio AB
+ * Copyright 2011-2019 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 #include <string.h>
 #include <rfb/Exception.h>
 #include <rfb/Security.h>
+#include <rfb/clipboardTypes.h>
 #include <rfb/msgTypes.h>
 #include <rfb/fenceTypes.h>
 #include <rfb/SMsgReader.h>
@@ -52,23 +53,26 @@ SConnection::SConnection()
   : readyForSetColourMapEntries(false),
     is(0), os(0), reader_(0), writer_(0),
     ssecurity(0), state_(RFBSTATE_UNINITIALISED),
-    preferredEncoding(encodingRaw)
+    preferredEncoding(encodingRaw),
+    clientClipboard(NULL), hasLocalClipboard(false)
 {
   defaultMajorVersion = 3;
   defaultMinorVersion = 8;
   if (rfb::Server::protocol3_3)
     defaultMinorVersion = 3;
 
-  cp.setVersion(defaultMajorVersion, defaultMinorVersion);
+  client.setVersion(defaultMajorVersion, defaultMinorVersion);
 }
 
 SConnection::~SConnection()
 {
-  if (ssecurity) ssecurity->destroy();
+  if (ssecurity)
+    delete ssecurity;
   delete reader_;
   reader_ = 0;
   delete writer_;
   writer_ = 0;
+  strFree(clientClipboard);
 }
 
 void SConnection::setStreams(rdr::InStream* is_, rdr::OutStream* os_)
@@ -79,7 +83,12 @@ void SConnection::setStreams(rdr::InStream* is_, rdr::OutStream* os_)
 
 void SConnection::initialiseProtocol()
 {
-  cp.writeVersion(os);
+  char str[13];
+
+  sprintf(str, "RFB %03d.%03d\n", defaultMajorVersion, defaultMinorVersion);
+  os->writeBytes(str, 12);
+  os->flush();
+
   state_ = RFBSTATE_PROTOCOL_VERSION;
 }
 
@@ -103,35 +112,47 @@ void SConnection::processMsg()
 
 void SConnection::processVersionMsg()
 {
+  char verStr[13];
+  int majorVersion;
+  int minorVersion;
+
   vlog.debug("reading protocol version");
-  bool done;
-  if (!cp.readVersion(is, &done)) {
+
+  if (!is->checkNoWait(12))
+    return;
+
+  is->readBytes(verStr, 12);
+  verStr[12] = '\0';
+
+  if (sscanf(verStr, "RFB %03d.%03d\n",
+             &majorVersion, &minorVersion) != 2) {
     state_ = RFBSTATE_INVALID;
     throw Exception("reading version failed: not an RFB client?");
   }
-  if (!done) return;
+
+  client.setVersion(majorVersion, minorVersion);
 
   vlog.info("Client needs protocol version %d.%d",
-            cp.majorVersion, cp.minorVersion);
+            client.majorVersion, client.minorVersion);
 
-  if (cp.majorVersion != 3) {
+  if (client.majorVersion != 3) {
     // unknown protocol version
     throwConnFailedException("Client needs protocol version %d.%d, server has %d.%d",
-                             cp.majorVersion, cp.minorVersion,
+                             client.majorVersion, client.minorVersion,
                              defaultMajorVersion, defaultMinorVersion);
   }
 
-  if (cp.minorVersion != 3 && cp.minorVersion != 7 && cp.minorVersion != 8) {
+  if (client.minorVersion != 3 && client.minorVersion != 7 && client.minorVersion != 8) {
     vlog.error("Client uses unofficial protocol version %d.%d",
-               cp.majorVersion,cp.minorVersion);
-    if (cp.minorVersion >= 8)
-      cp.minorVersion = 8;
-    else if (cp.minorVersion == 7)
-      cp.minorVersion = 7;
+               client.majorVersion,client.minorVersion);
+    if (client.minorVersion >= 8)
+      client.minorVersion = 8;
+    else if (client.minorVersion == 7)
+      client.minorVersion = 7;
     else
-      cp.minorVersion = 3;
+      client.minorVersion = 3;
     vlog.error("Assuming compatibility with version %d.%d",
-               cp.majorVersion,cp.minorVersion);
+               client.majorVersion,client.minorVersion);
   }
 
   versionReceived();
@@ -140,7 +161,7 @@ void SConnection::processVersionMsg()
   std::list<rdr::U8>::iterator i;
   secTypes = security.GetEnabledSecTypes();
 
-  if (cp.isVersion(3,3)) {
+  if (client.isVersion(3,3)) {
 
     // cope with legacy 3.3 client only if "no authentication" or "vnc
     // authentication" is supported.
@@ -149,13 +170,13 @@ void SConnection::processVersionMsg()
     }
     if (i == secTypes.end()) {
       throwConnFailedException("No supported security type for %d.%d client",
-                               cp.majorVersion, cp.minorVersion);
+                               client.majorVersion, client.minorVersion);
     }
 
     os->writeU32(*i);
     if (*i == secTypeNone) os->flush();
     state_ = RFBSTATE_SECURITY;
-    ssecurity = security.GetSSecurity(*i);
+    ssecurity = security.GetSSecurity(this, *i);
     processSecurityMsg();
     return;
   }
@@ -198,7 +219,7 @@ void SConnection::processSecurityType(int secType)
 
   try {
     state_ = RFBSTATE_SECURITY;
-    ssecurity = security.GetSSecurity(secType);
+    ssecurity = security.GetSSecurity(this, secType);
   } catch (rdr::Exception& e) {
     throwConnFailedException("%s", e.str());
   }
@@ -210,7 +231,7 @@ void SConnection::processSecurityMsg()
 {
   vlog.debug("processing security message");
   try {
-    bool done = ssecurity->processMsg(this);
+    bool done = ssecurity->processMsg();
     if (done) {
       state_ = RFBSTATE_QUERYING;
       setAccessRights(ssecurity->getAccessRights());
@@ -218,11 +239,8 @@ void SConnection::processSecurityMsg()
     }
   } catch (AuthFailureException& e) {
     vlog.error("AuthFailureException: %s", e.str());
-    os->writeU32(secResultFailed);
-    if (!cp.beforeVersion(3,8)) // 3.8 onwards have failure message
-      os->writeString(e.str());
-    os->flush();
-    throw;
+    state_ = RFBSTATE_SECURITY_FAILURE;
+    authFailure(e.str());
   }
 }
 
@@ -244,7 +262,7 @@ void SConnection::throwConnFailedException(const char* format, ...)
   vlog.info("Connection failed: %s", str);
 
   if (state_ == RFBSTATE_PROTOCOL_VERSION) {
-    if (cp.majorVersion == 3 && cp.minorVersion == 3) {
+    if (client.majorVersion == 3 && client.minorVersion == 3) {
       os->writeU32(0);
       os->writeString(str);
       os->flush();
@@ -259,13 +277,14 @@ void SConnection::throwConnFailedException(const char* format, ...)
   throw ConnFailedException(str);
 }
 
-void SConnection::writeConnFailedFromScratch(const char* msg,
-                                             rdr::OutStream* os)
+void SConnection::setAccessRights(AccessRights ar)
 {
-  os->writeBytes("RFB 003.003\n", 12);
-  os->writeU32(0);
-  os->writeString(msg);
-  os->flush();
+  accessRights = ar;
+}
+
+bool SConnection::accessCheck(AccessRights ar) const
+{
+  return (accessRights & ar) == ar;
 }
 
 void SConnection::setEncodings(int nEncodings, const rdr::S32* encodings)
@@ -281,6 +300,69 @@ void SConnection::setEncodings(int nEncodings, const rdr::S32* encodings)
   }
 
   SMsgHandler::setEncodings(nEncodings, encodings);
+
+  if (client.supportsEncoding(pseudoEncodingExtendedClipboard)) {
+    rdr::U32 sizes[] = { 0 };
+    writer()->writeClipboardCaps(rfb::clipboardUTF8 |
+                                 rfb::clipboardRequest |
+                                 rfb::clipboardPeek |
+                                 rfb::clipboardNotify |
+                                 rfb::clipboardProvide,
+                                 sizes);
+  }
+}
+
+void SConnection::clientCutText(const char* str)
+{
+  strFree(clientClipboard);
+  clientClipboard = NULL;
+
+  clientClipboard = latin1ToUTF8(str);
+
+  handleClipboardAnnounce(true);
+}
+
+void SConnection::handleClipboardRequest(rdr::U32 flags)
+{
+  if (!(flags & rfb::clipboardUTF8))
+    return;
+  if (!hasLocalClipboard)
+    return;
+  handleClipboardRequest();
+}
+
+void SConnection::handleClipboardPeek(rdr::U32 flags)
+{
+  if (!hasLocalClipboard)
+    return;
+  if (client.clipboardFlags() & rfb::clipboardNotify)
+    writer()->writeClipboardNotify(rfb::clipboardUTF8);
+}
+
+void SConnection::handleClipboardNotify(rdr::U32 flags)
+{
+  strFree(clientClipboard);
+  clientClipboard = NULL;
+
+  if (flags & rfb::clipboardUTF8)
+    handleClipboardAnnounce(true);
+  else
+    handleClipboardAnnounce(false);
+}
+
+void SConnection::handleClipboardProvide(rdr::U32 flags,
+                                         const size_t* lengths,
+                                         const rdr::U8* const* data)
+{
+  if (!(flags & rfb::clipboardUTF8))
+    return;
+
+  strFree(clientClipboard);
+  clientClipboard = NULL;
+
+  clientClipboard = convertLF((const char*)data[0], lengths[0]);
+
+  handleClipboardData(clientClipboard);
 }
 
 void SConnection::supportsQEMUKeyEvent()
@@ -296,6 +378,19 @@ void SConnection::authSuccess()
 {
 }
 
+void SConnection::authFailure(const char* reason)
+{
+  if (state_ != RFBSTATE_SECURITY_FAILURE)
+    throw Exception("SConnection::authFailure: invalid state");
+
+  os->writeU32(secResultFailed);
+  if (!client.beforeVersion(3,8)) // 3.8 onwards have failure message
+    os->writeString(reason);
+  os->flush();
+
+  throw AuthFailureException(reason);
+}
+
 void SConnection::queryConnection(const char* userName)
 {
   approveConnection(true);
@@ -306,12 +401,12 @@ void SConnection::approveConnection(bool accept, const char* reason)
   if (state_ != RFBSTATE_QUERYING)
     throw Exception("SConnection::approveConnection: invalid state");
 
-  if (!cp.beforeVersion(3,8) || ssecurity->getType() != secTypeNone) {
+  if (!client.beforeVersion(3,8) || ssecurity->getType() != secTypeNone) {
     if (accept) {
       os->writeU32(secResultOK);
     } else {
       os->writeU32(secResultFailed);
-      if (!cp.beforeVersion(3,8)) { // 3.8 onwards have failure message
+      if (!client.beforeVersion(3,8)) { // 3.8 onwards have failure message
         if (reason)
           os->writeString(reason);
         else
@@ -324,7 +419,7 @@ void SConnection::approveConnection(bool accept, const char* reason)
   if (accept) {
     state_ = RFBSTATE_INITIALISATION;
     reader_ = new SMsgReader(this, is);
-    writer_ = new SMsgWriter(&cp, os);
+    writer_ = new SMsgWriter(&client, os);
     authSuccess();
   } else {
     state_ = RFBSTATE_INVALID;
@@ -337,8 +432,14 @@ void SConnection::approveConnection(bool accept, const char* reason)
 
 void SConnection::clientInit(bool shared)
 {
-  writer_->writeServerInit();
+  writer_->writeServerInit(client.width(), client.height(),
+                           client.pf(), client.name());
   state_ = RFBSTATE_NORMAL;
+}
+
+void SConnection::close(const char* reason)
+{
+  state_ = RFBSTATE_CLOSING;
 }
 
 void SConnection::setPixelFormat(const PixelFormat& pf)
@@ -353,7 +454,7 @@ void SConnection::framebufferUpdateRequest(const Rect& r, bool incremental)
 {
   if (!readyForSetColourMapEntries) {
     readyForSetColourMapEntries = true;
-    if (!cp.pf().trueColour) {
+    if (!client.pf().trueColour) {
       writeFakeColourMap();
     }
   }
@@ -375,13 +476,65 @@ void SConnection::enableContinuousUpdates(bool enable,
 {
 }
 
+void SConnection::handleClipboardRequest()
+{
+}
+
+void SConnection::handleClipboardAnnounce(bool available)
+{
+}
+
+void SConnection::handleClipboardData(const char* data)
+{
+}
+
+void SConnection::requestClipboard()
+{
+  if (clientClipboard != NULL) {
+    handleClipboardData(clientClipboard);
+    return;
+  }
+
+  if (client.supportsEncoding(pseudoEncodingExtendedClipboard) &&
+      (client.clipboardFlags() & rfb::clipboardRequest))
+    writer()->writeClipboardRequest(rfb::clipboardUTF8);
+}
+
+void SConnection::announceClipboard(bool available)
+{
+  hasLocalClipboard = available;
+
+  if (client.supportsEncoding(pseudoEncodingExtendedClipboard) &&
+      (client.clipboardFlags() & rfb::clipboardNotify))
+    writer()->writeClipboardNotify(available ? rfb::clipboardUTF8 : 0);
+  else {
+    if (available)
+      handleClipboardRequest();
+  }
+}
+
+void SConnection::sendClipboardData(const char* data)
+{
+  if (client.supportsEncoding(pseudoEncodingExtendedClipboard) &&
+      (client.clipboardFlags() & rfb::clipboardProvide)) {
+    CharArray filtered(convertCRLF(data));
+    size_t sizes[1] = { strlen(filtered.buf) + 1 };
+    const rdr::U8* data[1] = { (const rdr::U8*)filtered.buf };
+    writer()->writeClipboardProvide(rfb::clipboardUTF8, sizes, data);
+  } else {
+    CharArray latin1(utf8ToLatin1(data));
+
+    writer()->writeServerCutText(latin1.buf);
+  }
+}
+
 void SConnection::writeFakeColourMap(void)
 {
   int i;
   rdr::U16 red[256], green[256], blue[256];
 
   for (i = 0;i < 256;i++)
-    cp.pf().rgbFromPixel(i, &red[i], &green[i], &blue[i]);
+    client.pf().rgbFromPixel(i, &red[i], &green[i], &blue[i]);
 
   writer()->writeSetColourMapEntries(0, 256, red, green, blue);
 }

@@ -11,13 +11,17 @@ vncviewer \- VNC viewer for X
 .RI [ host ][:: port ]
 .br
 .B vncviewer
+.RI [ options ]
+.RI [ unix\ socket ]
+.br
+.B vncviewer
 .RI [ options ] 
 .B \-listen
 .RI [ port ]
 .br
 .B vncviewer
 .RI [ options ]
-.RI [ .tigervnc file ]
+.RI [ .tigervnc\ file ]
 .SH DESCRIPTION
 .B vncviewer
 is a viewer (client) for Virtual Network Computing.  This manual page documents
@@ -115,7 +119,11 @@ Specifies the X display on which the VNC viewer window should appear.
 .
 .TP
 .B \-geometry \fIgeometry\fP
-Standard X position and sizing specification.
+Initial position of the main VNC viewer window. The format is
+.B \fIwidth\fPx\fIheight\fP+\fIxoffset\fP+\fIyoffset\fP
+, where `+' signs can be replaced with `\-' signs to specify offsets from the
+right and/or from the bottom of the screen.  Offsets are optional and the
+window will be placed by the window manager by default.
 .
 .TP
 .B \-listen \fI[port]\fP
@@ -172,6 +180,11 @@ Accept clipboard changes from the server. Default is on.
 .B \-SetPrimary
 Set the primary selection as well as the clipboard selection.
 Default is on.
+.
+.TP
+.B \-MaxCutText \fIbytes\fP
+The maximum size of a clipboard update that will be accepted from a server.
+Default is \fB262144\fP.
 .
 .TP
 .B \-SendClipboard
@@ -316,7 +329,7 @@ Default certificate revocation list.
 .BR vncconfig (1),
 .BR vncserver (1)
 .br
-http://www.tigervnc.org
+https://www.tigervnc.org
 
 .SH AUTHOR
 Tristan Richardson, RealVNC Ltd. and others.

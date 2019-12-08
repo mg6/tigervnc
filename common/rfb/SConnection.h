@@ -1,5 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
- * Copyright 2011 Pierre Ossman for Cendio AB
+ * Copyright 2011-2019 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -69,11 +69,28 @@ namespace rfb {
     void approveConnection(bool accept, const char* reason=0);
 
 
+    // Methods to terminate the connection
+
+    // close() shuts down the connection to the client and awaits
+    // cleanup of the SConnection object by the server
+    virtual void close(const char* reason);
+
+
     // Overridden from SMsgHandler
 
     virtual void setEncodings(int nEncodings, const rdr::S32* encodings);
 
+    virtual void clientCutText(const char* str);
+
+    virtual void handleClipboardRequest(rdr::U32 flags);
+    virtual void handleClipboardPeek(rdr::U32 flags);
+    virtual void handleClipboardNotify(rdr::U32 flags);
+    virtual void handleClipboardProvide(rdr::U32 flags,
+                                        const size_t* lengths,
+                                        const rdr::U8* const* data);
+
     virtual void supportsQEMUKeyEvent();
+
 
     // Methods to be overridden in a derived class
 
@@ -84,6 +101,10 @@ namespace rfb {
 
     // authSuccess() is called when authentication has succeeded.
     virtual void authSuccess();
+
+    // authFailure() is called when authentication has failed. The default
+    // implementation will inform the client and throw a AuthFailureException.
+    virtual void authFailure(const char* reason);
 
     // queryConnection() is called when authentication has succeeded, but
     // before informing the client.  It can be overridden to query a local user
@@ -118,8 +139,44 @@ namespace rfb {
     virtual void enableContinuousUpdates(bool enable,
                                          int x, int y, int w, int h);
 
+    // handleClipboardRequest() is called whenever the client requests
+    // the server to send over its clipboard data. It will only be
+    // called after the server has first announced a clipboard change
+    // via announceClipboard().
+    virtual void handleClipboardRequest();
+
+    // handleClipboardAnnounce() is called to indicate a change in the
+    // clipboard on the client. Call requestClipboard() to access the
+    // actual data.
+    virtual void handleClipboardAnnounce(bool available);
+
+    // handleClipboardData() is called when the client has sent over
+    // the clipboard data as a result of a previous call to
+    // requestClipboard(). Note that this function might never be
+    // called if the clipboard data was no longer available when the
+    // client received the request.
+    virtual void handleClipboardData(const char* data);
+
+
+    // Other methods
+
+    // requestClipboard() will result in a request to the client to
+    // transfer its clipboard data. A call to handleClipboardData()
+    // will be made once the data is available.
+    virtual void requestClipboard();
+
+    // announceClipboard() informs the client of changes to the
+    // clipboard on the server. The client may later request the
+    // clipboard data via handleClipboardRequest().
+    virtual void announceClipboard(bool available);
+
+    // sendClipboardData() transfers the clipboard data to the client
+    // and should be called whenever the client has requested the
+    // clipboard via handleClipboardRequest().
+    virtual void sendClipboardData(const char* data);
+
     // setAccessRights() allows a security package to limit the access rights
-    // of a VNCSConnectionST to the server.  How the access rights are treated
+    // of a SConnection to the server.  How the access rights are treated
     // is up to the derived class.
 
     typedef rdr::U16 AccessRights;
@@ -132,26 +189,13 @@ namespace rfb {
     static const AccessRights AccessDefault;        // The default rights, INCLUDING FUTURE ONES
     static const AccessRights AccessNoQuery;        // Connect without local user accepting
     static const AccessRights AccessFull;           // All of the available AND FUTURE rights
-    virtual void setAccessRights(AccessRights ar) = 0;
-
-    // Other methods
+    virtual void setAccessRights(AccessRights ar);
+    virtual bool accessCheck(AccessRights ar) const;
 
     // authenticated() returns true if the client has authenticated
     // successfully.
     bool authenticated() { return (state_ == RFBSTATE_INITIALISATION ||
                                    state_ == RFBSTATE_NORMAL); }
-
-    // throwConnFailedException() prints a message to the log, sends a conn
-    // failed message to the client (if possible) and throws a
-    // ConnFailedException.
-    void throwConnFailedException(const char* format, ...) __printf_attr(2, 3);
-
-    // writeConnFailedFromScratch() sends a conn failed message to an OutStream
-    // without the need to negotiate the protocol version first.  It actually
-    // does this by assuming that the client will understand version 3.3 of the
-    // protocol.
-    static void writeConnFailedFromScratch(const char* msg,
-                                           rdr::OutStream* os);
 
     SMsgReader* reader() { return reader_; }
     SMsgWriter* writer() { return writer_; }
@@ -164,6 +208,7 @@ namespace rfb {
       RFBSTATE_PROTOCOL_VERSION,
       RFBSTATE_SECURITY_TYPE,
       RFBSTATE_SECURITY,
+      RFBSTATE_SECURITY_FAILURE,
       RFBSTATE_QUERYING,
       RFBSTATE_INITIALISATION,
       RFBSTATE_NORMAL,
@@ -176,6 +221,11 @@ namespace rfb {
     rdr::S32 getPreferredEncoding() { return preferredEncoding; }
 
   protected:
+    // throwConnFailedException() prints a message to the log, sends a conn
+    // failed message to the client (if possible) and throws a
+    // ConnFailedException.
+    void throwConnFailedException(const char* format, ...) __printf_attr(2, 3);
+
     void setState(stateEnum s) { state_ = s; }
 
     void setReader(SMsgReader *r) { reader_ = r; }
@@ -201,6 +251,10 @@ namespace rfb {
     SSecurity* ssecurity;
     stateEnum state_;
     rdr::S32 preferredEncoding;
+    AccessRights accessRights;
+
+    char* clientClipboard;
+    bool hasLocalClipboard;
   };
 }
 #endif

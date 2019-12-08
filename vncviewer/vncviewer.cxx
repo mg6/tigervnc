@@ -100,9 +100,9 @@ static const char *about_text()
            _("TigerVNC Viewer %d-bit v%s\n"
              "Built on: %s\n"
              "Copyright (C) 1999-%d TigerVNC Team and many others (see README.rst)\n"
-             "See http://www.tigervnc.org for information on TigerVNC."),
+             "See https://www.tigervnc.org for information on TigerVNC."),
            (int)sizeof(size_t)*8, PACKAGE_VERSION,
-           BUILD_TIMESTAMP, 2018);
+           BUILD_TIMESTAMP, 2019);
 
   return buffer;
 }
@@ -348,10 +348,28 @@ static void usage(const char *programName)
 #endif
 
   fprintf(stderr,
-          "\nusage: %s [parameters] [host:displayNum] [parameters]\n"
-          "       %s [parameters] -listen [port] [parameters]\n"
+          "\n"
+          "usage: %s [parameters] [host][:displayNum]\n"
+          "       %s [parameters] [host][::port]\n"
+#ifndef WIN32
+          "       %s [parameters] [unix socket]\n"
+#endif
+          "       %s [parameters] -listen [port]\n"
           "       %s [parameters] [.tigervnc file]\n",
-          programName, programName, programName);
+          programName, programName,
+#ifndef WIN32
+          programName,
+#endif
+          programName, programName);
+
+#if !defined(WIN32) && !defined(__APPLE__)
+  fprintf(stderr,"\n"
+          "Options:\n\n"
+          "  -display Xdisplay  - Specifies the X display for the viewer window\n"
+          "  -geometry geometry - Initial position of the main VNC viewer window. See the\n"
+          "                       man page for details.\n");
+#endif
+
   fprintf(stderr,"\n"
           "Parameters can be turned on with -<param> or off with -<param>=0\n"
           "Parameters which take a value can be specified as "
@@ -393,7 +411,8 @@ potentiallyLoadConfigurationFile(char *vncServerName)
       newServerName = loadViewerParameters(vncServerName);
       // This might be empty, but we still need to clear it so we
       // don't try to connect to the filename
-      strncpy(vncServerName, newServerName, VNCSERVERNAMELEN);
+      strncpy(vncServerName, newServerName, VNCSERVERNAMELEN-1);
+      vncServerName[VNCSERVERNAMELEN-1] = '\0';
     } catch (rfb::Exception& e) {
       vlog.error("%s", e.str());
       if (alertOnFatalError)
@@ -470,9 +489,9 @@ static int mktunnel()
   int localPort = findFreeTcpPort();
   int remotePort;
 
-  gatewayHost = strDup(via.getValueStr());
   if (interpretViaParam(remoteHost, &remotePort, localPort) != 0)
     return 1;
+  gatewayHost = (const char*)via;
   createTunnel(gatewayHost, remoteHost, remotePort, localPort);
 
   return 0;
@@ -523,8 +542,10 @@ int main(int argc, char** argv)
   try {
     const char* configServerName;
     configServerName = loadViewerParameters(NULL);
-    if (configServerName != NULL)
-      strncpy(defaultServerName, configServerName, VNCSERVERNAMELEN);
+    if (configServerName != NULL) {
+      strncpy(defaultServerName, configServerName, VNCSERVERNAMELEN-1);
+      defaultServerName[VNCSERVERNAMELEN-1] = '\0';
+    }
   } catch (rfb::Exception& e) {
     vlog.error("%s", e.str());
     if (alertOnFatalError)

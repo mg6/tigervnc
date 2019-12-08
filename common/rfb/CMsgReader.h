@@ -1,5 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
- * Copyright 2009-2014 Pierre Ossman for Cendio AB
+ * Copyright 2009-2019 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -53,6 +53,7 @@ namespace rfb {
     void readSetColourMapEntries();
     void readBell();
     void readServerCutText();
+    void readExtendedClipboard(rdr::S32 len);
     void readFence();
     void readEndOfContinuousUpdates();
 
@@ -63,9 +64,11 @@ namespace rfb {
     void readSetXCursor(int width, int height, const Point& hotspot);
     void readSetCursor(int width, int height, const Point& hotspot);
     void readSetCursorWithAlpha(int width, int height, const Point& hotspot);
+    void readSetVMwareCursor(int width, int height, const Point& hotspot);
     void readSetDesktopName(int x, int y, int w, int h);
     void readExtendedDesktopSize(int x, int y, int w, int h);
     void readLEDState();
+    void readVMwareLEDState();
 
     CMsgHandler* handler;
     rdr::InStream* is;

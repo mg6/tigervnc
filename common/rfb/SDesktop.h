@@ -1,4 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
+ * Copyright 2009-2019 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,6 +45,8 @@
 #include <rfb/screenTypes.h>
 #include <rfb/util.h>
 
+namespace network { class Socket; }
+
 namespace rfb {
 
   class VNCServer;
@@ -56,14 +59,28 @@ namespace rfb {
     // set via the VNCServer's setPixelBuffer() method by the time this call
     // returns.
 
-    virtual void start(VNCServer* __unused_attr vs) {}
+    virtual void start(VNCServer* vs) = 0;
 
     // stop() is called by the server when there are no longer any
     // authenticated clients, and therefore the desktop can cease any
     // expensive tasks.  No further calls to the VNCServer passed to start()
     // can be made once stop has returned.
 
-    virtual void stop() {}
+    virtual void stop() = 0;
+
+    // queryConnection() is called when a connection has been
+    // successfully authenticated.  The sock and userName arguments
+    // identify the socket and the name of the authenticated user, if
+    // any. At some point later VNCServer::approveConnection() should
+    // be called to either accept or reject the client.
+    virtual void queryConnection(network::Socket* sock,
+                                 const char* userName) = 0;
+
+    // terminate() is called by the server when it wishes to terminate
+    // itself, e.g. because it was configured to terminate when no one is
+    // using it.
+
+    virtual void terminate() = 0;
 
     // setScreenLayout() requests to reconfigure the framebuffer and/or
     // the layout of screens.
@@ -77,6 +94,25 @@ namespace rfb {
     // pointerEvent(), keyEvent() and clientCutText() are called in response to
     // the relevant RFB protocol messages from clients.
     // See InputHandler for method signatures.
+
+    // handleClipboardRequest() is called whenever a client requests
+    // the server to send over its clipboard data. It will only be
+    // called after the server has first announced a clipboard change
+    // via VNCServer::announceClipboard().
+    virtual void handleClipboardRequest() {}
+
+    // handleClipboardAnnounce() is called to indicate a change in the
+    // clipboard on a client. Call VNCServer::requestClipboard() to
+    // access the actual data.
+    virtual void handleClipboardAnnounce(bool __unused_attr available) {}
+
+    // handleClipboardData() is called when a client has sent over
+    // the clipboard data as a result of a previous call to
+    // VNCServer::requestClipboard(). Note that this function might
+    // never be called if the clipboard data was no longer available
+    // when the client received the request.
+    virtual void handleClipboardData(const char* __unused_attr data) {}
+
   protected:
     virtual ~SDesktop() {}
   };
@@ -111,6 +147,10 @@ namespace rfb {
     virtual void stop() {
       server->setPixelBuffer(0);
       server = 0;
+    }
+    virtual void queryConnection(network::Socket* sock,
+                                 const char* userName) {
+      server->approveConnection(sock, true, NULL);
     }
 
   protected:

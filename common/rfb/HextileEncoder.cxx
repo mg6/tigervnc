@@ -45,7 +45,7 @@ BoolParameter improvedHextile("ImprovedHextile",
 #undef BPP
 
 HextileEncoder::HextileEncoder(SConnection* conn) :
-  Encoder(conn, encodingHextile, EncoderPlain, -1)
+  Encoder(conn, encodingHextile, EncoderPlain)
 {
 }
 
@@ -55,7 +55,7 @@ HextileEncoder::~HextileEncoder()
 
 bool HextileEncoder::isSupported()
 {
-  return conn->cp.supportsEncoding(encodingHextile);
+  return conn->client.supportsEncoding(encodingHextile);
 }
 
 void HextileEncoder::writeRect(const PixelBuffer* pb, const Palette& palette)

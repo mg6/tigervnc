@@ -103,12 +103,12 @@ DesktopWindow::DesktopWindow(int w, int h, const char *name,
   int geom_x = 0, geom_y = 0;
   if (strcmp(geometry, "") != 0) {
     int matched;
-    matched = sscanf(geometry.getValueStr(), "+%d+%d", &geom_x, &geom_y);
+    matched = sscanf((const char*)geometry, "+%d+%d", &geom_x, &geom_y);
     if (matched == 2) {
       force_position(1);
     } else {
       int geom_w, geom_h;
-      matched = sscanf(geometry.getValueStr(), "%dx%d+%d+%d", &geom_w, &geom_h, &geom_x, &geom_y);
+      matched = sscanf((const char*)geometry, "%dx%d+%d+%d", &geom_w, &geom_h, &geom_x, &geom_y);
       switch (matched) {
       case 4:
         force_position(1);
@@ -235,7 +235,7 @@ void DesktopWindow::setName(const char *name)
 void DesktopWindow::updateWindow()
 {
   if (firstUpdate) {
-    if (cc->cp.supportsSetDesktopSize) {
+    if (cc->server.supportsSetDesktopSize) {
       // Hack: Wait until we're in the proper mode and position until
       // resizing things, otherwise we might send the wrong thing.
       if (delayedFullscreen)
@@ -276,17 +276,33 @@ void DesktopWindow::resizeFramebuffer(int new_w, int new_h)
 }
 
 
-void DesktopWindow::serverCutText(const char* str, rdr::U32 len)
-{
-  viewport->serverCutText(str, len);
-}
-
-
 void DesktopWindow::setCursor(int width, int height,
                               const rfb::Point& hotspot,
                               const rdr::U8* data)
 {
   viewport->setCursor(width, height, hotspot, data);
+}
+
+
+void DesktopWindow::show()
+{
+  Fl_Window::show();
+
+#if !defined(WIN32) && !defined(__APPLE__)
+  XEvent e;
+
+  // Request ability to grab keyboard under Xwayland
+  e.xany.type = ClientMessage;
+  e.xany.window = fl_xid(this);
+  e.xclient.message_type = XInternAtom (fl_display, "_XWAYLAND_MAY_GRAB_KEYBOARD", 0);
+  e.xclient.format = 32;
+  e.xclient.data.l[0] = 1;
+  e.xclient.data.l[1] = 0;
+  e.xclient.data.l[2] = 0;
+  e.xclient.data.l[3] = 0;
+  e.xclient.data.l[4] = 0;
+  XSendEvent(fl_display, RootWindow(fl_display, fl_screen), 0, SubstructureNotifyMask | SubstructureRedirectMask, &e);
+#endif
 }
 
 
@@ -365,9 +381,21 @@ void DesktopWindow::draw()
   // Overlay (if active)
   if (overlay) {
     int ox, oy, ow, oh;
+    int sx, sy, sw, sh;
 
-    ox = X = (w() - overlay->width()) / 2;
-    oy = Y = 50;
+    // Make sure it's properly seen by adjusting it relative to the
+    // primary screen rather than the entire window
+    if (fullscreen_active() && fullScreenAllMonitors) {
+      assert(Fl::screen_count() >= 1);
+      Fl::screen_xywh(sx, sy, sw, sh, 0);
+    } else {
+      sx = 0;
+      sy = 0;
+      sw = w();
+    }
+
+    ox = X = sx + (sw - overlay->width()) / 2;
+    oy = Y = sy + 50;
     ow = overlay->width();
     oh = overlay->height();
 
@@ -405,6 +433,22 @@ void DesktopWindow::draw()
 void DesktopWindow::setLEDState(unsigned int state)
 {
   viewport->setLEDState(state);
+}
+
+
+void DesktopWindow::handleClipboardRequest()
+{
+  viewport->handleClipboardRequest();
+}
+
+void DesktopWindow::handleClipboardAnnounce(bool available)
+{
+  viewport->handleClipboardAnnounce(available);
+}
+
+void DesktopWindow::handleClipboardData(const char* data)
+{
+  viewport->handleClipboardData(data);
 }
 
 
@@ -475,7 +519,7 @@ void DesktopWindow::resize(int x, int y, int w, int h)
     // d) We're not still waiting for startup fullscreen to kick in
     //
     if (not firstUpdate and not delayedFullscreen and
-        ::remoteResize and cc->cp.supportsSetDesktopSize) {
+        ::remoteResize and cc->server.supportsSetDesktopSize) {
       // We delay updating the remote desktop as we tend to get a flood
       // of resize events as the user is dragging the window.
       Fl::remove_timeout(handleResizeTimeout, this);
@@ -498,6 +542,9 @@ void DesktopWindow::menuOverlay(void* data)
 
 void DesktopWindow::setOverlay(const char* text, ...)
 {
+  const Fl_Fontsize fontsize = 16;
+  const int margin = 10;
+
   va_list ap;
   char textbuf[1024];
 
@@ -528,22 +575,22 @@ void DesktopWindow::setOverlay(const char* text, ...)
     fl_gc = XDefaultGC(fl_display, 0);
 #endif
 
-  fl_font(FL_HELVETICA, FL_NORMAL_SIZE * 2);
+  fl_font(FL_HELVETICA, fontsize);
   w = 0;
   fl_measure(textbuf, w, h);
 
   // Margins
-  w += 80;
-  h += 40;
+  w += margin * 2 * 2;
+  h += margin * 2;
 
   surface = new Fl_Image_Surface(w, h);
   surface->set_current();
 
   fl_rectf(0, 0, w, h, 0, 0, 0);
 
-  fl_font(FL_HELVETICA, FL_NORMAL_SIZE * 2);
+  fl_font(FL_HELVETICA, fontsize);
   fl_color(FL_WHITE);
-  fl_draw(textbuf, 40, 20 + fl_height() - fl_descent());
+  fl_draw(textbuf, 0, 0, w, h, FL_ALIGN_CENTER);
 
   imageText = surface->image();
   delete surface;
@@ -578,11 +625,6 @@ void DesktopWindow::setOverlay(const char* text, ...)
   }
 
   delete imageText;
-
-  x = (this->w() - image->w()) / 2;
-  y = 50;
-  w = image->w();
-  h = image->h();
 
   overlay = new Surface(image);
   overlayAlpha = 0;
@@ -1004,14 +1046,14 @@ void DesktopWindow::handleResizeTimeout(void *data)
 void DesktopWindow::remoteResize(int width, int height)
 {
   ScreenSet layout;
-  ScreenSet::iterator iter;
+  ScreenSet::const_iterator iter;
 
   if (!fullscreen_active() || (width > w()) || (height > h())) {
     // In windowed mode (or the framebuffer is so large that we need
     // to scroll) we just report a single virtual screen that covers
     // the entire framebuffer.
 
-    layout = cc->cp.screenLayout;
+    layout = cc->server.screenLayout();
 
     // Not sure why we have no screens, but adding a new one should be
     // safe as there is nothing to conflict with...
@@ -1067,8 +1109,8 @@ void DesktopWindow::remoteResize(int width, int height)
       sy -= viewport_rect.tl.y;
 
       // Look for perfectly matching existing screen...
-      for (iter = cc->cp.screenLayout.begin();
-           iter != cc->cp.screenLayout.end(); ++iter) {
+      for (iter = cc->server.screenLayout().begin();
+           iter != cc->server.screenLayout().end(); ++iter) {
         if ((iter->dimensions.tl.x == sx) &&
             (iter->dimensions.tl.y == sy) &&
             (iter->dimensions.width() == sw) &&
@@ -1077,7 +1119,7 @@ void DesktopWindow::remoteResize(int width, int height)
       }
 
       // Found it?
-      if (iter != cc->cp.screenLayout.end()) {
+      if (iter != cc->server.screenLayout().end()) {
         layout.add_screen(*iter);
         continue;
       }
@@ -1085,13 +1127,13 @@ void DesktopWindow::remoteResize(int width, int height)
       // Need to add a new one, which means we need to find an unused id
       while (true) {
         id = rand();
-        for (iter = cc->cp.screenLayout.begin();
-             iter != cc->cp.screenLayout.end(); ++iter) {
+        for (iter = cc->server.screenLayout().begin();
+             iter != cc->server.screenLayout().end(); ++iter) {
           if (iter->id == id)
             break;
         }
 
-        if (iter == cc->cp.screenLayout.end())
+        if (iter == cc->server.screenLayout().end())
           break;
       }
 
@@ -1105,14 +1147,14 @@ void DesktopWindow::remoteResize(int width, int height)
   }
 
   // Do we actually change anything?
-  if ((width == cc->cp.width) &&
-      (height == cc->cp.height) &&
-      (layout == cc->cp.screenLayout))
+  if ((width == cc->server.width()) &&
+      (height == cc->server.height()) &&
+      (layout == cc->server.screenLayout()))
     return;
 
   char buffer[2048];
   vlog.debug("Requesting framebuffer resize from %dx%d to %dx%d",
-             cc->cp.width, cc->cp.height, width, height);
+             cc->server.width(), cc->server.height(), width, height);
   layout.print(buffer, sizeof(buffer));
   vlog.debug("%s", buffer);
 

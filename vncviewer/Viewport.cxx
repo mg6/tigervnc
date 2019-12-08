@@ -1,5 +1,5 @@
 /* Copyright (C) 2002-2005 RealVNC Ltd.  All Rights Reserved.
- * Copyright 2011-2014 Pierre Ossman for Cendio AB
+ * Copyright 2011-2019 Pierre Ossman for Cendio AB
  * 
  * This is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -119,7 +119,7 @@ Viewport::Viewport(int w, int h, const rfb::PixelFormat& serverPF, CConn* cc_)
     altGrArmed(false),
 #endif
     firstLEDState(true),
-    pendingServerCutText(NULL), pendingClientCutText(NULL),
+    pendingServerClipboard(false), pendingClientClipboard(false),
     menuCtrlKey(false), menuAltKey(false), cursor(NULL)
 {
 #if !defined(WIN32) && !defined(__APPLE__)
@@ -208,8 +208,6 @@ Viewport::~Viewport()
     delete cursor;
   }
 
-  clearPendingClipboard();
-
   // FLTK automatically deletes all child widgets, so we shouldn't touch
   // them ourselves here
 }
@@ -230,43 +228,6 @@ void Viewport::updateWindow()
 
   r = frameBuffer->getDamage();
   damage(FL_DAMAGE_USER1, r.tl.x + x(), r.tl.y + y(), r.width(), r.height());
-}
-
-void Viewport::serverCutText(const char* str, rdr::U32 len)
-{
-  char *buffer;
-  int size, ret;
-
-  clearPendingClipboard();
-
-  if (!acceptClipboard)
-    return;
-
-  size = fl_utf8froma(NULL, 0, str, len);
-  if (size <= 0)
-    return;
-
-  size++;
-
-  buffer = new char[size];
-
-  ret = fl_utf8froma(buffer, size, str, len);
-  assert(ret < size);
-
-  vlog.debug("Got clipboard data (%d bytes)", (int)strlen(buffer));
-
-  if (!hasFocus()) {
-    pendingServerCutText = buffer;
-    return;
-  }
-
-  // RFB doesn't have separate selection and clipboard concepts, so we
-  // dump the data into both variants.
-  if (setPrimary)
-    Fl::copy(buffer, ret, 0);
-  Fl::copy(buffer, ret, 1);
-
-  delete [] buffer;
 }
 
 static const char * dotcursor_xpm[] = {
@@ -317,17 +278,68 @@ void Viewport::setCursor(int width, int height, const Point& hotspot,
     window()->cursor(cursor, cursorHotspot.x, cursorHotspot.y);
 }
 
+void Viewport::handleClipboardRequest()
+{
+  Fl::paste(*this, clipboardSource);
+}
+
+void Viewport::handleClipboardAnnounce(bool available)
+{
+  if (!acceptClipboard)
+    return;
+
+  if (available)
+    vlog.debug("Got notification of new clipboard on server");
+  else
+    vlog.debug("Clipboard is no longer available on server");
+
+  if (!available) {
+    pendingServerClipboard = false;
+    return;
+  }
+
+  pendingClientClipboard = false;
+
+  if (!hasFocus()) {
+    pendingServerClipboard = true;
+    return;
+  }
+
+  cc->requestClipboard();
+}
+
+void Viewport::handleClipboardData(const char* data)
+{
+  size_t len;
+
+  if (!hasFocus())
+    return;
+
+  len = strlen(data);
+
+  vlog.debug("Got clipboard data (%d bytes)", (int)len);
+
+  // RFB doesn't have separate selection and clipboard concepts, so we
+  // dump the data into both variants.
+#if !defined(WIN32) && !defined(__APPLE__)
+  if (setPrimary)
+    Fl::copy(data, len, 0);
+#endif
+  Fl::copy(data, len, 1);
+}
 
 void Viewport::setLEDState(unsigned int state)
 {
   vlog.debug("Got server LED state: 0x%08x", state);
 
   // The first message is just considered to be the server announcing
-  // support for this extension, so start by pushing our state to the
-  // remote end to get things in sync
+  // support for this extension. We will push our state to sync up the
+  // server when we get focus. If we already have focus we need to push
+  // it here though.
   if (firstLEDState) {
     firstLEDState = false;
-    pushLEDState();
+    if (hasFocus())
+      pushLEDState();
     return;
   }
 
@@ -425,7 +437,7 @@ void Viewport::pushLEDState()
   unsigned int state;
 
   // Server support?
-  if (cc->cp.ledState() == ledUnknown)
+  if (cc->server.ledState() == ledUnknown)
     return;
 
   state = 0;
@@ -458,7 +470,7 @@ void Viewport::pushLEDState()
     state |= ledNumLock;
 
   // No support for Scroll Lock //
-  state |= (cc->cp.ledState() & ledScrollLock);
+  state |= (cc->server.ledState() & ledScrollLock);
 
 #else
   unsigned int mask;
@@ -484,17 +496,17 @@ void Viewport::pushLEDState()
     state |= ledScrollLock;
 #endif
 
-  if ((state & ledCapsLock) != (cc->cp.ledState() & ledCapsLock)) {
+  if ((state & ledCapsLock) != (cc->server.ledState() & ledCapsLock)) {
     vlog.debug("Inserting fake CapsLock to get in sync with server");
     handleKeyPress(0x3a, XK_Caps_Lock);
     handleKeyRelease(0x3a);
   }
-  if ((state & ledNumLock) != (cc->cp.ledState() & ledNumLock)) {
+  if ((state & ledNumLock) != (cc->server.ledState() & ledNumLock)) {
     vlog.debug("Inserting fake NumLock to get in sync with server");
     handleKeyPress(0x45, XK_Num_Lock);
     handleKeyRelease(0x45);
   }
-  if ((state & ledScrollLock) != (cc->cp.ledState() & ledScrollLock)) {
+  if ((state & ledScrollLock) != (cc->server.ledState() & ledScrollLock)) {
     vlog.debug("Inserting fake ScrollLock to get in sync with server");
     handleKeyPress(0x46, XK_Scroll_Lock);
     handleKeyRelease(0x46);
@@ -545,37 +557,24 @@ void Viewport::resize(int x, int y, int w, int h)
 
 int Viewport::handle(int event)
 {
-  char *buffer;
-  int ret;
+  char *filtered;
   int buttonMask, wheelMask;
   DownMap::const_iterator iter;
 
   switch (event) {
   case FL_PASTE:
-    buffer = new char[Fl::event_length() + 1];
+    filtered = convertLF(Fl::event_text(), Fl::event_length());
 
-    clearPendingClipboard();
-
-    // This is documented as to ASCII, but actually does to 8859-1
-    ret = fl_utf8toa(Fl::event_text(), Fl::event_length(), buffer,
-                     Fl::event_length() + 1);
-    assert(ret < (Fl::event_length() + 1));
-
-    if (!hasFocus()) {
-      pendingClientCutText = buffer;
-      return 1;
-    }
-
-    vlog.debug("Sending clipboard data (%d bytes)", (int)strlen(buffer));
+    vlog.debug("Sending clipboard data (%d bytes)", (int)strlen(filtered));
 
     try {
-      cc->writer()->writeClientCutText(buffer, ret);
+      cc->sendClipboardData(filtered);
     } catch (rdr::Exception& e) {
       vlog.error("%s", e.str());
       exit_vncviewer(e.str());
     }
 
-    delete [] buffer;
+    strFree(filtered);
 
     return 1;
 
@@ -587,7 +586,10 @@ int Viewport::handle(int event)
 
   case FL_LEAVE:
     window()->cursor(FL_CURSOR_DEFAULT);
-    // Fall through as we want a last move event to help trigger edge stuff
+    // We want a last move event to help trigger edge stuff
+    handlePointerEvent(Point(Fl::event_x() - x(), Fl::event_y() - y()), 0);
+    return 1;
+
   case FL_PUSH:
   case FL_RELEASE:
   case FL_DRAG:
@@ -624,16 +626,17 @@ int Viewport::handle(int event)
   case FL_FOCUS:
     Fl::disable_im();
 
-    try {
-      flushPendingClipboard();
+    flushPendingClipboard();
 
-      // We may have gotten our lock keys out of sync with the server
-      // whilst we didn't have focus. Try to sort this out.
-      pushLEDState();
-    } catch (rdr::Exception& e) {
-      vlog.error("%s", e.str());
-      exit_vncviewer(e.str());
-    }
+    // We may have gotten our lock keys out of sync with the server
+    // whilst we didn't have focus. Try to sort this out.
+    pushLEDState();
+
+    // Resend Ctrl/Alt if needed
+    if (menuCtrlKey)
+      handleKeyPress(0x1d, XK_Control_L);
+    if (menuAltKey)
+      handleKeyPress(0x38, XK_Alt_L);
 
     // Yes, we would like some focus please!
     return 1;
@@ -729,34 +732,47 @@ void Viewport::handleClipboardChange(int source, void *data)
     return;
 #endif
 
-  Fl::paste(*self, source);
-}
+  self->clipboardSource = source;
 
+  self->pendingServerClipboard = false;
 
-void Viewport::clearPendingClipboard()
-{
-  delete [] pendingServerCutText;
-  pendingServerCutText = NULL;
-  delete [] pendingClientCutText;
-  pendingClientCutText = NULL;
+  if (!self->hasFocus()) {
+    self->pendingClientClipboard = true;
+    // Clear any older client clipboard from the server
+    self->cc->announceClipboard(false);
+    return;
+  }
+
+  try {
+    self->cc->announceClipboard(true);
+  } catch (rdr::Exception& e) {
+    vlog.error("%s", e.str());
+    exit_vncviewer(e.str());
+  }
 }
 
 
 void Viewport::flushPendingClipboard()
 {
-  if (pendingServerCutText) {
-    size_t len = strlen(pendingServerCutText);
-    if (setPrimary)
-      Fl::copy(pendingServerCutText, len, 0);
-    Fl::copy(pendingServerCutText, len, 1);
+  if (pendingServerClipboard) {
+    try {
+      cc->requestClipboard();
+    } catch (rdr::Exception& e) {
+      vlog.error("%s", e.str());
+      exit_vncviewer(e.str());
+    }
   }
-  if (pendingClientCutText) {
-    size_t len = strlen(pendingClientCutText);
-    vlog.debug("Sending pending clipboard data (%d bytes)", (int)len);
-    cc->writer()->writeClientCutText(pendingClientCutText, len);
+  if (pendingClientClipboard) {
+    try {
+      cc->announceClipboard(true);
+    } catch (rdr::Exception& e) {
+      vlog.error("%s", e.str());
+      exit_vncviewer(e.str());
+    }
   }
 
-  clearPendingClipboard();
+  pendingServerClipboard = false;
+  pendingClientClipboard = false;
 }
 
 
@@ -927,6 +943,13 @@ int Viewport::handleSystemEvent(void *event, void *data)
 
     keyCode = ((msg->lParam >> 16) & 0xff);
 
+    // Windows' touch keyboard doesn't set a scan code for the Alt
+    // portion of the AltGr sequence, so we need to help it out
+    if (!isExtended && (keyCode == 0x00) && (vKey == VK_MENU)) {
+      isExtended = true;
+      keyCode = 0x38;
+    }
+
     // Windows doesn't have a proper AltGr, but handles it using fake
     // Ctrl+Alt. However the remote end might not be Windows, so we need
     // to merge those in to a single AltGr event. We detect this case
@@ -1030,6 +1053,12 @@ int Viewport::handleSystemEvent(void *event, void *data)
     isExtended = (msg->lParam & (1 << 24)) != 0;
 
     keyCode = ((msg->lParam >> 16) & 0xff);
+
+    // Touch keyboard AltGr (see above)
+    if (!isExtended && (keyCode == 0x00) && (vKey == VK_MENU)) {
+      isExtended = true;
+      keyCode = 0x38;
+    }
 
     // We can't get a release in the middle of an AltGr sequence, so
     // abort that detection

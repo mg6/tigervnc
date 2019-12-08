@@ -65,8 +65,8 @@ public class VncViewer extends javax.swing.JApplet
   public static final String aboutText =
     new String("TigerVNC Java Viewer v%s (%s)%n"+
                "Built on %s at %s%n"+
-               "Copyright (C) 1999-2018 TigerVNC Team and many others (see README.rst)%n"+
-               "See http://www.tigervnc.org for information on TigerVNC.");
+               "Copyright (C) 1999-2019 TigerVNC Team and many others (see README.rst)%n"+
+               "See https://www.tigervnc.org for information on TigerVNC.");
 
   public static String version = null;
   public static String build = null;
@@ -85,7 +85,7 @@ public class VncViewer extends javax.swing.JApplet
   private static VncViewer applet;
 
   private String defaultServerName;
-  int VNCSERVERNAMELEN = 64;
+  int VNCSERVERNAMELEN = 256;
   CharBuffer vncServerName = CharBuffer.allocate(VNCSERVERNAMELEN);
 
   public static void setLookAndFeel() {
