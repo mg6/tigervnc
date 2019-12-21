@@ -5,7 +5,7 @@ Index: pkg-tigervnc/unix/vncserver
 ===================================================================
 --- pkg-tigervnc.orig/unix/vncserver
 +++ pkg-tigervnc/unix/vncserver
-@@ -684,6 +684,7 @@ sub Usage
+@@ -678,6 +678,7 @@ sub Usage
  	"                 [-geometry <width>x<height>]\n".
  	"                 [-pixelformat rgbNNN|bgrNNN]\n".
  	"                 [-fp <font-path>]\n".
@@ -17,9 +17,9 @@ Index: pkg-tigervnc/vncviewer/vncviewer.cxx
 ===================================================================
 --- pkg-tigervnc.orig/vncviewer/vncviewer.cxx
 +++ pkg-tigervnc/vncviewer/vncviewer.cxx
-@@ -353,6 +353,11 @@ static void usage(const char *programNam
-           "       %s [parameters] [.tigervnc file]\n",
-           programName, programName, programName);
+@@ -371,6 +371,11 @@ static void usage(const char *programNam
+ #endif
+ 
    fprintf(stderr,"\n"
 +	  "Options:\n\n"
 +	  "  -display Xdisplay - Specifies the X display for the viewer window\n"
