@@ -2,14 +2,14 @@
 .\" ** The above line should force tbl to be a preprocessor **
 .\" Man page for Xvnc
 .\"
-.\" Copyright (C), 2006 - 2016, Joachim.Falk@gmx.de
+.\" Copyright (C), 2006 - 2019, Joachim.Falk@gmx.de
 .\" Copyright (C), 1998, Marcus.Brinkmann@ruhr-uni-bochum.de
 .\"
 .\" You may distribute under the terms of the GNU General Public
 .\" License as specified in the file COPYING that comes with the
 .\" Debian GNU/Linux distribution.
 .\"
-.TH vnc.conf 5x "Dec 8th, 2019" "TigerVNC 1.10" "Virtual Network Computing"
+.TH vnc.conf 5x "Dec 20th, 2019" "TigerVNC 1.10.1" "Virtual Network Computing"
 .SH NAME
 vnc.conf \- configuration file for Virtual Network Computing
 .SH SYNOPSIS
