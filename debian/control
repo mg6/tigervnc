@@ -25,6 +25,7 @@ Build-Depends:
  libxft-dev,
  libxcursor-dev,
  libxrandr-dev,
+ libxdamage-dev,
  libwrap0-dev,
  libfltk1.3-dev (>= 1.3.3),
  xorg-server-source (>= 2:1.20),
