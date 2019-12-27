@@ -1,9 +1,10 @@
-tigervnc (1.10.1+dfsg-1~RC1) unstable; urgency=medium
+tigervnc (1.10.1+dfsg-1) unstable; urgency=medium
 
   [ Joachim Falk ]
-  * Fresh upstream TigerVNC 1.10.1.
+  * Fresh upstream TigerVNC 1.10.1 fixes CVE-2019-15691, CVE-2019-15692,
+    CVE-2019-15693, CVE-2019-15694, and CVE-2019-15695 (Closes: #947428)
 
- -- Joachim Falk <joachim.falk@gmx.de>  Sat, 21 Dec 2019 13:19:51 +0100
+ -- Joachim Falk <joachim.falk@gmx.de>  Fri, 27 Dec 2019 13:19:04 +0100
 
 tigervnc (1.9.0+dfsg-4) unstable; urgency=medium
 
