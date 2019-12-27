@@ -2,6 +2,7 @@
 0151-make-cmake-enable-options-mandatory-if-turned-on.patch
 0175-xtigervncviewer-WM_CLASS.patch
 # dustbin/0176-tigervnc-1.9-fix-crash-on-disconnect.patch # no longer needed for TigerVNC 1.10
+0177-tigervnc-1.10.1-fix-setupShm-wrong-width-heigh-method.patch
 # rework/0200-add-tcpwrappers-support.patch # This patch is still not ported
 
 # These patches are lifted from RedHat
