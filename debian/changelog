@@ -1,4 +1,4 @@
-tigervnc (1.10.1+dfsg-1) unstable; urgency=high
+tigervnc (1.10.1+dfsg-1~RC3) UNRELEASED; urgency=high
 
   [ Joachim Falk ]
   * Fresh upstream TigerVNC 1.10.1 fixes CVE-2019-15691, CVE-2019-15692,
