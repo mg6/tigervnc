@@ -1,0 +1,27 @@
+Description: Use correct width and height methods in PlatformPixelBuffer::setupShm
+Author: Joachim Falk <joachim.falk@gmx.de>
+Abstract:
+ PlatformPixelBuffer::setupShm uses the width() and height() methods to
+ determine the correct geometry for a XImage. However, the width() and height()
+ methods are defined in both the Surface as well as the FullFramePixelBuffer
+ base classes of PlatformPixelBuffer. Before v1.10.1 these methods accessed
+ fields that where both initialized to the requested image dimensions.
+ However, starting from v1.10.1 the width() and height() methods of
+ FullFramePixelBuffer return zero when setupShm is called. It will later be
+ initialized to the correct dimensions by a setBuffer method call in the
+ constructor of PlatformPixelBuffer.
+ This patch switches to Surface::{width,height} which return the correct dimensions.
+
+Index: pkg-tigervnc/vncviewer/PlatformPixelBuffer.cxx
+===================================================================
+--- pkg-tigervnc.orig/vncviewer/PlatformPixelBuffer.cxx
++++ pkg-tigervnc/vncviewer/PlatformPixelBuffer.cxx
+@@ -153,7 +153,7 @@ bool PlatformPixelBuffer::setupShm()
+   shminfo = new XShmSegmentInfo;
+ 
+   xim = XShmCreateImage(fl_display, CopyFromParent, 32,
+-                        ZPixmap, 0, shminfo, width(), height());
++                        ZPixmap, 0, shminfo, this->Surface::width(), this->Surface::height());
+   if (!xim)
+     goto free_shminfo;
+ 
