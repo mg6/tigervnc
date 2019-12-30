@@ -3,9 +3,10 @@ tigervnc (1.10.1+dfsg-1) unstable; urgency=high
   [ Joachim Falk ]
   * Fresh upstream TigerVNC 1.10.1 fixes CVE-2019-15691, CVE-2019-15692,
     CVE-2019-15693, CVE-2019-15694, and CVE-2019-15695 (Closes: #947428)
-  * Fixed bug in PlatformPixelBuffer::setupShm to use correct width and height methods.
+  * Fixed bug in PlatformPixelBuffer::setupShm to use correct width and height
+    methods.
 
- -- Joachim Falk <joachim.falk@gmx.de>  Fri, 27 Dec 2019 20:46:35 +0100
+ -- Mike Gabriel <sunweaver@debian.org>  Mon, 30 Dec 2019 15:38:21 +0100
 
 tigervnc (1.9.0+dfsg-4) unstable; urgency=medium
 
