@@ -2,9 +2,9 @@ Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0
 Upstream-Name: TigerVNC
 Upstream-Contact: Peter Åstrand, Pierre Ossman, Adam Tkac
 Source: https://tigervnc.org
-Files-Excluded: win
+Files-Excluded: win .github .travis .travis.yml
 Comment: The win directory was removed because it is not needed for a Unix
- based build.
+ based build. Moreover, .github and .travis are also not needed for the build.
 
 Files: *
 Copyright: Copyright (C) 1999 AT&T Laboratories Cambridge
