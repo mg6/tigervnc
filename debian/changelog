@@ -1,3 +1,11 @@
+tigervnc (1.10.1+dfsg-2) unstable; urgency=medium
+
+  [ Joachim Falk ]
+  * Build fix for xorg-server-source 1.20.7, which moved ddxInputThread
+    call from os layer into ddx layer (Closes: #951938).
+
+ -- Joachim Falk <joachim.falk@gmx.de>  Thu, 12 Mar 2020 18:57:16 +0100
+
 tigervnc (1.10.1+dfsg-1) unstable; urgency=high
 
   [ Joachim Falk ]

@@ -1,0 +1,23 @@
+Description: Build fix for xorg-server 1.20.7, which moved ddxInputThread call from os layer into ddx layer.
+Author: Lifted from OpenSUSE Tumbleweed tigervnc-1.10.0-5.1 source rpm.
+
+Index: pkg-tigervnc/unix/xserver/hw/vnc/xvnc.c
+===================================================================
+--- pkg-tigervnc.orig/unix/xserver/hw/vnc/xvnc.c
++++ pkg-tigervnc/unix/xserver/hw/vnc/xvnc.c
+@@ -295,6 +295,15 @@ void ddxBeforeReset(void)
+ }
+ #endif
+ 
++#if INPUTTHREAD
++/** This function is called in Xserver/os/inputthread.c when starting
++    the input thread. */
++void
++ddxInputThreadInit(void)
++{
++}
++#endif
++
+ void ddxUseMsg(void)
+ {
+     vncPrintBanner();
