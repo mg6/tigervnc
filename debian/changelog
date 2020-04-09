@@ -1,4 +1,4 @@
-tigervnc (1.10.1+dfsg-3~RC1) unstable; urgency=medium
+tigervnc (1.10.1+dfsg-3) unstable; urgency=medium
 
   [ Joachim Falk ]
   * Fixed issue "Authentication failure: Out of memory" when
