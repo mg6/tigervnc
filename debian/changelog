@@ -1,3 +1,12 @@
+tigervnc (1.10.1+dfsg-3~RC1) unstable; urgency=medium
+
+  [ Joachim Falk ]
+  * Fixed issue "Authentication failure: Out of memory" when
+    saving server certificate exceptions
+    (https://github.com/TigerVNC/tigervnc/issues/915).
+
+ -- Joachim Falk <joachim.falk@gmx.de>  Thu, 09 Apr 2020 08:49:31 +0200
+
 tigervnc (1.10.1+dfsg-2) unstable; urgency=medium
 
   [ Joachim Falk ]

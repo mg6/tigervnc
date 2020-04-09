@@ -1,0 +1,30 @@
+From dbad687182ae9093efaf096a069eeafc18b22973 Mon Sep 17 00:00:00 2001
+From: Pierre Ossman <ossman@cendio.se>
+Date: Mon, 30 Dec 2019 10:24:11 +0100
+Subject: [PATCH] Fix saving of bad server certificates
+
+This check is completely backwards and it is currently unknown how
+this ever worked.
+---
+ common/rfb/CSecurityTLS.cxx | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/common/rfb/CSecurityTLS.cxx b/common/rfb/CSecurityTLS.cxx
+index aa191090..c1a00212 100644
+--- a/common/rfb/CSecurityTLS.cxx
++++ b/common/rfb/CSecurityTLS.cxx
+@@ -416,8 +416,9 @@ void CSecurityTLS::checkSession()
+   delete [] certinfo;
+ 
+   if (gnutls_x509_crt_export(crt, GNUTLS_X509_FMT_PEM, NULL, &out_size)
+-      == GNUTLS_E_SHORT_MEMORY_BUFFER)
+-    throw AuthFailureException("Out of memory");
++      != GNUTLS_E_SHORT_MEMORY_BUFFER)
++    throw AuthFailureException("certificate issuer unknown, and certificate "
++                               "export failed");
+ 
+   // Save cert
+   out_buf =  new char[out_size];
+-- 
+2.20.1
+
