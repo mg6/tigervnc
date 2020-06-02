@@ -6,8 +6,7 @@ Uploaders:
  Joachim Falk <joachim.falk@gmx.de>,
  Mike Gabriel <sunweaver@debian.org>,
  Yaroslav Halchenko <debian@onerussian.com>,
- Ola Lundqvist <opal@debian.org>,
- Liang Guo <guoliang@debian.org>,
+ Ola Lundqvist <opal@debian.org>
 # all the Build-Depends up to x11proto-xf86-dri-dev are for the normal Xorg
 # server, and common dependencies for the DIX.
 # x11proto-xf86dri-dev and libdrm-dev are for DRI support for the Xorg server.
