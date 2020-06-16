@@ -1,11 +1,11 @@
-tigervnc (1.10.1+dfsg-4~RC1) unstable; urgency=medium
+tigervnc (1.10.1+dfsg-4) unstable; urgency=medium
 
   [ Joachim Falk ]
   * Remove Liang Guo <guoliang@debian.org> from uploaders (Closes: #961610).
   * Don't use libunwind for armel, armhf, and arm64 as this library is buggy
     (bug #923962) on those architectures (Closes: #932499).
 
- -- Joachim Falk <joachim.falk@gmx.de>  Tue, 02 Jun 2020 20:50:48 +0200
+ -- Joachim Falk <joachim.falk@gmx.de>  Tue, 16 Jun 2020 19:32:44 +0200
 
 tigervnc (1.10.1+dfsg-3) unstable; urgency=medium
 
