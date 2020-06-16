@@ -41,8 +41,7 @@ DEB_DH_AUTORECONF_CLEAN_ARGS =
 DEB_CONFIGURE_EXTRA_FLAGS +=
 
 DEB_CMAKE_INSTALL_PREFIX  = /usr
-DEB_CMAKE_EXTRA_FLAGS     += -DUSE_INCLUDED_ZLIB:BOOL=OFF
-DEB_CMAKE_EXTRA_FLAGS     += -DENABLE_LIBWRAP:BOOL=ON
+#DEB_CMAKE_EXTRA_FLAGS     += -DENABLE_LIBWRAP:BOOL=ON
 DEB_CMAKE_EXTRA_FLAGS     += -DENABLE_NLS:BOOL=ON
 DEB_CMAKE_EXTRA_FLAGS     += -DENABLE_GNUTLS:BOOL=ON
 DEB_CMAKE_EXTRA_FLAGS     += -DENABLE_PAM:BOOL=ON
@@ -83,7 +82,38 @@ TIGERVNC_PACKAGE = tigervnc
 TIGERVNC_VERSION = $(UPSTREAM_VERSION)
 TIGERVNC_TARBALL = $(TIGERVNC_PACKAGE)_$(UPSTREAM_DFSG_VERSION).orig.tar.xz
 
+# Unfortunately quoting in /usr/share/xserver-xorg/configure_flags.mk is fucked
+# up in buster and ${xxx} is not escaped correctly.
+xserver_confflags := $(shell cat /usr/share/xserver-xorg/configure_flags.mk | \
+  sed -ne '/^xserver_confflags\s*=/{s/^[^=]*=//;s/--with-builderstring="[^"]*"//;p}')
+
+#-include /usr/share/xserver-xorg/configure_flags.mk
+#xserver_confflags := $(shell echo '$(xserver_confflags)' | sed 's/--with-builderstring="[^"]*"//')
+
+XORG_DEBIAN_CONFIGURE_FLAGS := \
+	$(filter-out \
+		--prefix=% \
+		--mandir=% \
+		--infodir=% \
+		--sysconfdir=% \
+		--localstatedir=% \
+		--build=% \
+		--host=% \
+		--enable-xwayland \
+		--enable-dmx \
+		--enable-xvfb \
+		--enable-xnest \
+		--enable-xephyr \
+		--enable-xorg \
+		--enable-dri \
+		--enable-dri2 \
+		--enable-dri3 \
+		--enable-xmir \
+	    , $(xserver_confflags) \
+	)
+
 debug-debian-rules:
+	@echo '$$(XORG_DEBIAN_CONFIGURE_FLAGS) $(XORG_DEBIAN_CONFIGURE_FLAGS)'
 	@echo '$$(DEB_CONFIGURE_EXTRA_FLAGS) $(DEB_CONFIGURE_EXTRA_FLAGS)'
 	@echo '$$(DEB_CMAKE_EXTRA_FLAGS) $(DEB_CMAKE_EXTRA_FLAGS)'
 	@echo '$$(SOURCE_NAME) $(SOURCE_NAME)'
@@ -183,36 +213,6 @@ reverse-patches-remove-xorg-from-vnc-tree:
 		fi
 
 configure/tigervnc-standalone-server configure/tigervnc-xorg-extension:: $(DEB_BUILDDIR)/unix/xserver/configure.stamp
-
-# Unfortunately quoting in /usr/share/xserver-xorg/configure_flags.mk is fucked
-# up in buster and ${xxx} is not escaped correctly.
-xserver_confflags := $(shell cat /usr/share/xserver-xorg/configure_flags.mk | \
-  sed -ne '/^xserver_confflags\s*=/{s/^[^=]*=//;s/--with-builderstring="[^"]*"//;p}')
-
-#-include /usr/share/xserver-xorg/configure_flags.mk
-#xserver_confflags := $(shell echo '$(xserver_confflags)' | sed 's/--with-builderstring="[^"]*"//')
-
-XORG_DEBIAN_CONFIGURE_FLAGS = \
-	$(filter-out \
-		--prefix=% \
-		--mandir=% \
-		--infodir=% \
-		--sysconfdir=% \
-		--localstatedir=% \
-		--build=% \
-		--host=% \
-		--enable-xwayland \
-		--enable-dmx \
-		--enable-xvfb \
-		--enable-xnest \
-		--enable-xephyr \
-		--enable-xorg \
-		--enable-dri \
-		--enable-dri2 \
-		--enable-dri3 \
-		--enable-xmir \
-	    , $(xserver_confflags) \
-	)
 
 # Next step is run configure script. It is very difficult use correct parameters.
 # You should use same parameters as used in your distribution X server and add
