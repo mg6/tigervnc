@@ -25,6 +25,7 @@ VNC_LIBTOOL_PATCH = $(CURDIR)/contrib/packages/deb/ubuntu-xenial/debian/xorg-sou
 
 include /usr/share/cdbs/1/rules/debhelper.mk
 include /usr/share/cdbs/1/class/cmake.mk
+include /usr/share/dpkg/architecture.mk
 
 # Do our complex patch dance first! After that quilt patch system can proceed!
 clean:: unpatch
@@ -111,6 +112,14 @@ XORG_DEBIAN_CONFIGURE_FLAGS := \
 		--enable-xmir \
 	    , $(xserver_confflags) \
 	)
+
+# Don't use libunwind for armel, armhf, and arm64 as this library is buggy
+# (bug #923962) on those architectures.
+ifneq (,$(filter $(DEB_HOST_ARCH), armel armhf arm64))
+	DEB_CONFIGURE_EXTRA_FLAGS += --disable-libunwind
+	XORG_DEBIAN_CONFIGURE_FLAGS := \
+	    $(filter-out --enable-libunwind, $(XORG_DEBIAN_CONFIGURE_FLAGS))
+endif
 
 debug-debian-rules:
 	@echo '$$(XORG_DEBIAN_CONFIGURE_FLAGS) $(XORG_DEBIAN_CONFIGURE_FLAGS)'
