@@ -15,7 +15,7 @@ Abstract:
  Am 30.12.19 um 10:54 schrieb Pierre Ossman:
  > Oops. Thanks for finding this. Fortunately the consequences of this is
  > "just" worse performance, but it was still definitely unintentional.  I've
- > commited a different fix as 0f1ded05 that avoids the confusion of relying on
+ > committed a different fix as 0f1ded05 that avoids the confusion of relying on
  > the base classes during setup. Many thanks for spotting this and suggesting
  > a fix though.
 

@@ -1,3 +1,10 @@
+tigervnc (1.10.1+dfsg-5~RC1) unstable; urgency=medium
+
+  [ Joachim Falk ]
+  * Fixing lintian errors and warnings
+
+ -- Joachim Falk <joachim.falk@gmx.de>  Sat, 27 Jun 2020 10:50:20 +0200
+
 tigervnc (1.10.1+dfsg-4) unstable; urgency=medium
 
   [ Joachim Falk ]
