@@ -13,6 +13,7 @@ Uploaders:
 # x11proto-print-dev and libfreetype6-dev are for Xprint
 # everything on is for the DMX and Xnest servers.
 Build-Depends:
+ debhelper-compat (= 10),
  cdbs (>= 0.4.89),
  cmake (>= 2.8),
  pristine-tar,
@@ -30,7 +31,7 @@ Build-Depends:
  xorg-server-source (>= 2:1.20),
  xserver-xorg-dev,
 # this are dependencies from xorg-server-1.20.3 source deb
- debhelper (>= 10),
+# debhelper (>= 10),
  po-debconf,
  dpkg-dev (>= 1.16.1),
  quilt,

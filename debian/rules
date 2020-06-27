@@ -4,6 +4,14 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+# In case you would like CDBS not to create a 'debian/compat' file, you can
+# disable this feature by setting DEB_DH_COMPAT_DISABLE to a non-void value.
+DEB_DH_COMPAT_DISABLE=yes
+DH_COMPAT := $(shell sed -n -e '/^\s\+debhelper-compat\s\+(\s*=\s*[0-9]\+\s*)\s*,\s*$$/{s/^.*(\s*=\s*\([0-9]\+\)\s*).*$$/\1/;p}' debian/control)
+ifeq (,$(DH_COMPAT))
+$(error Can't derive debhelper compat level from debian/control)
+endif
+
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/buildflags.mk
