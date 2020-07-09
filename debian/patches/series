@@ -1,4 +1,5 @@
 0010-fix-xtigervnc-build.patch
+0020-buildtime-from-debian-changelog.patch
 0102-fix-spelling-error-in-manpages-to-shutup-lintian.patch
 0151-make-cmake-enable-options-mandatory-if-turned-on.patch
 0175-xtigervncviewer-WM_CLASS.patch

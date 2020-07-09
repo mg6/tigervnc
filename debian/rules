@@ -23,15 +23,18 @@ VNC_PATCH = $(CURDIR)/unix/xserver120.patch
 #VNC_LIBTOOL_PATCH = $(CURDIR)/contrib/packages/deb/ubuntu-xenial/debian/xorg-source-patches/debian_libtool.patch
 
 include /usr/share/dpkg/architecture.mk
+include /usr/share/dpkg/buildflags.mk
 
 # This is stolen from xorg-server/debian/xsfbs/xsfbs.mk
 # Determine (source) package name from Debian changelog.
-SOURCE_NAME:=$(shell dpkg-parsechangelog -ldebian/changelog \
-                        | grep '^Source:' | awk '{print $$2}')
+SOURCE_NAME:=$(shell dpkg-parsechangelog -SSource)
 
 # Determine package version from Debian changelog.
-SOURCE_VERSION:=$(shell dpkg-parsechangelog -ldebian/changelog \
-                        | grep '^Version:' | awk '{print $$2}')
+SOURCE_VERSION:=$(shell dpkg-parsechangelog -SVersion)
+
+# Determine package date from Debian changelog.
+BUILD_TIMESTAMP:=$(shell dpkg-parsechangelog -SDate | date -u -f- '+%Y-%m-%d %H:%M')
+export BUILD_TIMESTAMP
 
 # Strip a possible epoch marker from source version.
 NO_EPOCH_VER:=$(shell echo $(SOURCE_VERSION) | sed 's/^.://')
@@ -58,6 +61,7 @@ DEB_CMAKE_EXTRA_FLAGS	+= -DENABLE_NLS:BOOL=ON
 DEB_CMAKE_EXTRA_FLAGS	+= -DENABLE_GNUTLS:BOOL=ON
 DEB_CMAKE_EXTRA_FLAGS	+= -DENABLE_PAM:BOOL=ON
 #DEB_CMAKE_EXTRA_FLAGS	+= -DBUILD_JAVA=1
+DEB_CMAKE_EXTRA_FLAGS   += -DBUILD_TIMESTAMP="$(BUILD_TIMESTAMP)"
 
 # Unfortunately quoting in /usr/share/xserver-xorg/configure_flags.mk is fucked
 # up in buster and ${xxx} is not escaped correctly.
@@ -109,9 +113,12 @@ ifneq (,$(filter $(DEB_HOST_ARCH), armel armhf arm64))
 	XORG_DEBIAN_CONFIGURE_FLAGS := \
 	    $(filter-out --enable-libunwind, $(XORG_DEBIAN_CONFIGURE_FLAGS))
 endif
+DEB_CONFIGURE_EXTRA_FLAGS += \
+	CPPFLAGS='$(CPPFLAGS) -DBUILD_TIMESTAMP="\"$${BUILD_TIMESTAMP}\""'
 
 debug-debian-rules:
 	@echo '$$(SOURCE_NAME) $(SOURCE_NAME)'
+	@echo '$$(BUILD_TIMESTAMP) $(BUILD_TIMESTAMP)'
 	@echo '$$(SOURCE_VERSION) $(SOURCE_VERSION)'
 	@echo '$$(NO_EPOCH_VER) $(NO_EPOCH_VER)'
 	@echo '$$(UPSTREAM_DFSG_VERSION) $(UPSTREAM_DFSG_VERSION)'
