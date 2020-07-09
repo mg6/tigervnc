@@ -148,9 +148,8 @@ override_dh_auto_install:
 	  $(DEB_DESTDIR)/usr/bin/xvncviewer
 	mv $(DEB_DESTDIR)/usr/share/man/man1/vncviewer.1 \
 	  $(DEB_DESTDIR)/usr/share/man/man1/xvncviewer.1
-	mkdir -p $(DEB_DESTDIR)/usr/share/applications
-	cp debian/xtigervncviewer.desktop \
-	  $(DEB_DESTDIR)/usr/share/applications/
+	mv $(DEB_DESTDIR)/usr/share/applications/vncviewer.desktop \
+	  $(DEB_DESTDIR)/usr/share/applications/xvncviewer.desktop
 	mkdir -p $(DEB_DESTDIR)/usr/share/icons/hicolor/scalable/apps
 	cp media/icons/tigervnc.svg \
 	  $(DEB_DESTDIR)/usr/share/icons/hicolor/scalable/apps/
@@ -162,10 +161,12 @@ override_dh_auto_install:
 	# Hack, replace media/icons/tigervnc_16.png of wrong dimensions 20x20 by our fixed version.
 	cp debian/tigervnc_16.png \
 	  $(DEB_DESTDIR)/usr/share/icons/hicolor/16x16/apps/tigervnc.png
-	cd $(DEB_DESTDIR) && find usr/bin usr/share/man -name "*vnc*" | while read line; do \
-	  echo Rename "$$line" `echo "$$line" | sed -e 's/vnc/tigervnc/g'` ; \
-	  mv "$$line" `echo "$$line" | sed -e 's/vnc/tigervnc/g'`; \
-	done
+	cd $(DEB_DESTDIR) && \
+	  find usr/bin usr/share/man usr/share/applications -name "*vnc*" | \
+	  while read line; do \
+	    echo Rename "$$line" `echo "$$line" | sed -e 's/vnc/tigervnc/g'` ; \
+	    mv "$$line" `echo "$$line" | sed -e 's/vnc/tigervnc/g'`; \
+	  done
 	cp -pr debian/helpers/* \
 	  debian/tmp
 	find debian/tmp/usr/share/man -type f | while read line; do \

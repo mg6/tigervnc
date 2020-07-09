@@ -14,3 +14,20 @@ Index: pkg-tigervnc/vncviewer/vncviewer.cxx
  
    // Set the default icon for all windows.
  #ifdef WIN32
+Index: pkg-tigervnc/vncviewer/vncviewer.desktop.in.in
+===================================================================
+--- pkg-tigervnc.orig/vncviewer/vncviewer.desktop.in.in
++++ pkg-tigervnc/vncviewer/vncviewer.desktop.in.in
+@@ -2,9 +2,10 @@
+ Name=TigerVNC Viewer
+ GenericName=Remote Desktop Viewer
+ Comment=Connect to VNC server and display remote desktop
+-Exec=@BIN_DIR@/vncviewer
++Keywords=remote desktop;vnc;
++Exec=@BIN_DIR@/xtigervncviewer
+ Icon=tigervnc
+ Terminal=false
+ Type=Application
+-StartupWMClass=TigerVNC Viewer: Connection Details
++StartupWMClass=TigerVNC Viewer
+ Categories=Network;RemoteAccess;
