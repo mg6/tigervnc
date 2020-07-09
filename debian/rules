@@ -240,7 +240,7 @@ apply-unify-xorg-and-vnc-tree: unix/xserver/.apply-unify-xorg-and-vnc-tree.stamp
 unix/xserver/.apply-unify-xorg-and-vnc-tree.stamp:
 	cd $(XTIGERVNC_SRCDIR) && \
 	  { tar --strip-components 1 -xvJf /usr/src/xorg-server.tar.xz | \
-	      sed -e 's@^[^/]*/@@' > .apply-patches-unify-xorg-and-vnc-tree.files; } && \
+	      sed -e 's@^[^/]*/@@' > .apply-unify-xorg-and-vnc-tree.files; } && \
 	  touch .apply-unify-xorg-and-vnc-tree.stamp
 
 reverse-unify-xorg-and-vnc-tree: override_dh_auto_clean
