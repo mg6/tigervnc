@@ -1,11 +1,11 @@
-tigervnc (1.10.1+dfsg-5~RC2) unstable; urgency=medium
+tigervnc (1.10.1+dfsg-5) unstable; urgency=medium
 
   [ Joachim Falk ]
   * Fixing lintian errors and warnings
   * Switched away from CDBS to a pure debhelper build system.
   * New try to enable reproducible builds for TigerVNC (Closes: #865753).
 
- -- Joachim Falk <joachim.falk@gmx.de>  Thu, 09 Jul 2020 23:58:50 +0200
+ -- Joachim Falk <joachim.falk@gmx.de>  Fri, 10 Jul 2020 17:25:13 +0200
 
 tigervnc (1.10.1+dfsg-4) unstable; urgency=medium
 
