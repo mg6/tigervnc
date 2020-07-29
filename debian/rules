@@ -14,13 +14,12 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
 # Normal situation
-#VNC_PATCH = $(CURDIR)/unix/xserver117.patch
+VNC_PATCH = $(CURDIR)/unix/xserver120.patch
 # However in this case we do not have this file from upstream so we use a
 # debian specific copy instead.
-#VNC_PATCH = $(CURDIR)/unix/xserver119.patch
-VNC_PATCH = $(CURDIR)/unix/xserver120.patch
+#VNC_PATCH = $(CURDIR)/debian/xserver121.patch
 
-#VNC_LIBTOOL_PATCH = $(CURDIR)/contrib/packages/deb/ubuntu-xenial/debian/xorg-source-patches/debian_libtool.patch
+VNC_LIBTOOL_PATCH = $(CURDIR)/contrib/packages/deb/ubuntu-xenial/debian/xorg-source-patches/debian_libtool.patch
 
 include /usr/share/dpkg/architecture.mk
 include /usr/share/dpkg/buildflags.mk
@@ -135,6 +134,13 @@ debug-debian-rules:
 	@echo '$$(DEB_CONFIGURE_EXTRA_FLAGS) $(DEB_CONFIGURE_EXTRA_FLAGS)'
 	@echo '$$(DEB_DESTDIR) $(DEB_DESTDIR)'
 
+.PHONY: override_dh_autoreconf
+override_dh_autoreconf:
+	dh_autoreconf
+	cd $(XTIGERVNC_SRCDIR) && { \
+	    patch --no-backup-if-mismatch -p1 < $(VNC_LIBTOOL_PATCH); \
+	  }
+
 .PHONY: override_dh_auto_configure
 override_dh_auto_configure:
 	dh_auto_configure -D$(TIGERVNC_SRCDIR) -B$(TIGERVNC_BUILDDIR) -- \
@@ -230,22 +236,6 @@ reverse-vnc-patch-xorg: $(VNC_PATCH)
 		rm -f .apply-vnc-patch-xorg.stamp; \
 	fi
 
-#.PHONY: apply-vnc-patch-xorg-libtool reverse-vnc-patch-xorg-libtool
-#
-#apply-vnc-patch-xorg-libtool: unix/xserver/.apply-vnc-patch-xorg-libtool.stamp
-#
-#unix/xserver/.apply-vnc-patch-xorg-libtool.stamp: $(VNC_LIBTOOL_PATCH)
-#	cd $(XTIGERVNC_SRCDIR) && { \
-#		patch --no-backup-if-mismatch -p1 < $(VNC_LIBTOOL_PATCH) && \
-#		touch .apply-vnc-patch-xorg-libtool.stamp; \
-#	}
-#
-#reverse-vnc-patch-xorg-libtool: $(VNC_LIBTOOL_PATCH)
-#	cd $(XTIGERVNC_SRCDIR) && if test -f .apply-vnc-patch-xorg-libtool.stamp; then \
-#		patch --no-backup-if-mismatch -R -p1 < $(VNC_LIBTOOL_PATCH); \
-#		rm -f .apply-vnc-patch-xorg-libtool.stamp; \
-#	fi
-
 .PHONY: apply-unify-xorg-and-vnc-tree reverse-unify-xorg-and-vnc-tree
 
 apply-unify-xorg-and-vnc-tree: unix/xserver/.apply-unify-xorg-and-vnc-tree.stamp
@@ -262,7 +252,7 @@ reverse-unify-xorg-and-vnc-tree: override_dh_auto_clean
 			sort -r < .apply-unify-xorg-and-vnc-tree.files | \
 				while read line; do \
 					if test -d "$$line"; then \
-						rmdir "$$line" || true; \
+						rmdir --ignore-fail-on-non-empty "$$line"; \
 					else \
 						rm -f "$$line"; \
 					fi; \
