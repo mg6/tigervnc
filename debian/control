@@ -15,7 +15,6 @@ Uploaders:
 Build-Depends:
  debhelper-compat (= 12),
  cmake (>= 2.8),
- pristine-tar,
  gettext,
  zlib1g-dev,
  libjpeg-dev,
