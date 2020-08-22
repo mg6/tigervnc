@@ -99,8 +99,6 @@ License: BSD-3-Clause
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Files: java/com/tigervnc/network/SSLEngineManager.java
-COpyright: Copyright (C) 2012,2014 Brian P. Hinz
-           Copyright (C) 2012 D. R. Commander.
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
@@ -115,6 +113,8 @@ License: LGPL-2.1+
  You should have received a copy of the GNU Lesser General Public
  License along with this library; if not, write to the Free Software
  Foundation, Inc., 51 Franklin Street, 5th Floor, Boston, MA 02110-1301 USA
+Copyright: Copyright (C) 2012,2014 Brian P. Hinz
+           Copyright (C) 2012 D. R. Commander.
 
 Files: unix/xserver/hw/vnc/xvnc.c
 Copyright: Copyright (c) 1993  X Consortium
