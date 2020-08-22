@@ -3,6 +3,9 @@ tigervnc (1.11.0+dfsg-1~RC5) UNRELEASED; urgency=medium
   [ Joachim Falk ]
   * Fresh upstream TigerVNC 1.11.0
 
+  [ Debian Janitor ]
+  * Use correct machine-readable copyright file URI.
+
  -- Joachim Falk <joachim.falk@gmx.de>  Thu, 01 Oct 2020 17:39:13 +0200
 
 tigervnc (1.10.1+dfsg-9) unstable; urgency=medium
