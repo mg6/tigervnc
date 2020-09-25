@@ -3,7 +3,7 @@
 #
 # vncserver - wrapper script to start an X VNC server.
 #
-# Copyright (C) 2004-2018 Joachim Falk <joachim.falk@gmx.de>
+# Copyright (C) 2004-2020 Joachim Falk <joachim.falk@gmx.de>
 # Please report all errors to Joachim Falk and not to OL.
 #
 # This file is based on a vncserver script provided by:
@@ -58,7 +58,7 @@ sub readConfigFile {
 #    if (/^\s*([^=]+)\s*=\s*(\S.*)$/o) {
 #      my $ret = eval "$1=$2";
 #      if ($@) {
-#	print STDERR "$PROG: Error parsing config file $ConfigFile at line $lineno!\n";
+#        print STDERR "$PROG: Error parsing config file $ConfigFile at line $lineno!\n";
 #      }
 #    }
 #  }
@@ -124,7 +124,7 @@ cmd:
       my $fqcmd = File::Spec->catfile($dir, $cmd);
       if (-x $fqcmd) {
         $CMDS{$cmd} = $fqcmd;
-	next cmd;
+        next cmd;
       }
     }
     print STDERR "$PROG: Couldn't find \"$cmd\" on your PATH.\n";
@@ -204,9 +204,9 @@ sub readXFConfig {
       # is font directory or fontserver (xfs) ?
       if ($tempFontPath !~ m{^[^/]*/[^/]*:\d+$}) {
         # font directory
-	$tempFontPath =~ s/:unscaled$//; # remove :unscaled
-	# is really a font directory ?
-	next unless -r "$tempFontPath/fonts.dir"; # skip if not
+        $tempFontPath =~ s/:unscaled$//; # remove :unscaled
+        # is really a font directory ?
+        next unless -r "$tempFontPath/fonts.dir"; # skip if not
       }
       $fontPath .= "$tempFontPath,";
     }
@@ -313,12 +313,12 @@ sub getXDisplayDefaults {
 
     for ($i = 0; $i < @lines; $i++) {
       if ($lines[$i] =~ /^\s*visual id:\s+$defaultVisualId$/) {
-	if (($lines[$i+1] !~ /TrueColor/) ||
-	    ($lines[$i+2] !~ /depth/) ||
-	    ($lines[$i+4] !~ /red, green, blue masks/)) {
-	  return;
-	}
-	last;
+        if (($lines[$i+1] !~ /TrueColor/) ||
+            ($lines[$i+2] !~ /depth/) ||
+            ($lines[$i+4] !~ /red, green, blue masks/)) {
+          return;
+        }
+        last;
       }
     }
 
@@ -326,8 +326,8 @@ sub getXDisplayDefaults {
 
     ( $options->{'depth'} ) = ($lines[$i+2] =~ /depth:\s+(\d+)/);
     my ($red,$green,$blue)
-	= ($lines[$i+4]
-	   =~ /masks:\s+0x([0-9a-f]+), 0x([0-9a-f]+), 0x([0-9a-f]+)/);
+        = ($lines[$i+4]
+           =~ /masks:\s+0x([0-9a-f]+), 0x([0-9a-f]+), 0x([0-9a-f]+)/);
 
     $red = hex($red);
     $green = hex($green);
@@ -374,7 +374,7 @@ sub checkTCPPortUsed {
 sub checkDisplayNumberUsed {
   my ($n) = @_;
   return &checkTCPPortUsed( 5900 + $n ) ||
-	 &checkTCPPortUsed( 6000 + $n );
+         &checkTCPPortUsed( 6000 + $n );
 }
 
 #
@@ -499,7 +499,7 @@ sub runningUserVncservers {
       }
       my $DISPLAY = -e "/tmp/.X11-unix/X${usedDisplay}"
         ? ":${usedDisplay}"
-	: "$HOSTFQDN:${usedDisplay}";
+        : "$HOSTFQDN:${usedDisplay}";
       my $rfbport     = 5900 + $usedDisplay;
       my $logFile     = desktopLog($options, $usedDisplay);
       my $logFileFh   = File::ReadBackwards->new($logFile);
@@ -719,26 +719,6 @@ sub startXvncServer {
   &CreateX509Cert($options);
   &CreateMITCookie($options);
 
-  # Create the user's vncStartup script if necessary.
-  if (defined($vncStartup) && !$xstartupArg && !(-e $vncStartup)) {
-    print "Creating default startup script $vncStartup\n";
-    unless ($options->{'dry-run'}) {
-      my $sf = IO::File->new($vncStartup, "w", 0755);
-      unless (defined $sf) {
-        print STDERR "$PROG: Can't create startup script '$vncStartup': $!\n";
-        exit 1;
-      }
-      print $sf $options->{'defaultVncStartup'};
-      $sf->close;
-    }
-  }
-  if (defined($vncStartup) && !$xstartupArg && !(-x $vncStartup)) {
-    unless ($options->{'dry-run'} || chmod 0755, $vncStartup) {
-      print STDERR "$PROG: Can't fixup permissions of startup script '$vncStartup': $!\n";
-      exit 1;
-    }
-  }
-
   my $pidFileFh  = IO::File->new($pidFile, "w", 0644);
   unless (defined $pidFileFh) {
     print STDERR "$PROG: Can't create pid file '$pidFile': $!\n";
@@ -876,7 +856,7 @@ sub startXvncServer {
   if ($childPid == 0) {
     # I am the child
     my @cmd = ($vncStartup);
-    push @cmd, @{$options->{'sessionArgs'}};
+    push @cmd, @{$options->{'session'}};
     print join(" ",@cmd), "\n" if $options->{'verbose'};
 
     open(OLDOUT, '>&', \*STDOUT); # save old STDOUT
@@ -1035,67 +1015,54 @@ sub main {
   my $options = {
 # Values that are documented in /etc/vnc.conf
 ## Values declared as system values in /etc/vnc.conf
-      vncClasses		=>
+      vncClasses                =>
         undef, # /var/www/vnc if the directory exists (checked later)
-      baseHttpPort		=> undef,
-      XFConfigPath		=> "/etc/X11/xorg.conf",
-      fontPath			=> undef,
-      PAMService		=>
+      baseHttpPort              => undef,
+      XFConfigPath              => "/etc/X11/xorg.conf",
+      fontPath                  => undef,
+      PAMService                =>
         undef, # Use vnc if /etc/pam.d/vnc exists. Otherwise,
-	       # use our own /etc/pam.d/tigervnc as fallback.
-      sslAutoGenCertCommand	=>
-      	"openssl req -newkey ec:/etc/tigervnc/ecparams.pem -x509 -days 2190 -nodes",
+               # use our own /etc/pam.d/tigervnc as fallback.
+      sslAutoGenCertCommand     =>
+        "openssl req -newkey ec:/etc/tigervnc/ecparams.pem -x509 -days 2190 -nodes",
 ## Values declared as user values in /etc/vnc.conf, i.e., values
 ## that are intended to be overwritten by ~/.vnc/vnc.conf.
-      vncUserDir		=>
+      vncUserDir                =>
         File::Spec->catfile($ENV{HOME}, ".vnc"),
-      vncPasswdFile		=>
+      vncPasswdFile             =>
         undef, # later derived from vncUserDir
-      vncStartup		=>
-        undef, # later derived from vncUserDir
-      xauthorityFile		=>
+      vncStartup                =>
+        "/etc/X11/Xvnc-session",
+      xauthorityFile            =>
         $ENV{XAUTHORITY} ||
         File::Spec->catfile($ENV{HOME}, ".Xauthority"),
-      desktopName		=> undef,
-      wmDecoration		=>
-      	"8x64", # a guess at the typical size for a window manager decoration
-      geometry			=> "1280x1024",
-      depth			=> 24,
-      pixelformat		=> undef,
-      getDefaultFrom		=> undef,
-      rfbwait			=> 30000,
-      rfbport			=> undef,
-      localhost			=> undef,
-      SecurityTypes		=>
+      desktopName               => undef,
+      wmDecoration              =>
+        "8x64", # a guess at the typical size for a window manager decoration
+      geometry                  => "1280x1024",
+      depth                     => 24,
+      pixelformat               => undef,
+      getDefaultFrom            => undef,
+      rfbwait                   => 30000,
+      rfbport                   => undef,
+      localhost                 => undef,
+      SecurityTypes             =>
         undef, # later derived depening on localhost setting
-      PlainUsers		=>
+      PlainUsers                =>
         undef, # later derived from /usr/bin/id -u -n
-      X509Cert			=>
-      	undef, # auto generated if absent and stored in
-	       # ~/.vnc/${HOSTFQDN}-SrvCert.pem
-      X509Key			=>
-      	undef, # auto generated if absent and stored in
-	       # ~/.vnc/${HOSTFQDN}-SrvKey.pem
+      X509Cert                  =>
+        undef, # auto generated if absent and stored in
+               # ~/.vnc/${HOSTFQDN}-SrvCert.pem
+      X509Key                   =>
+        undef, # auto generated if absent and stored in
+               # ~/.vnc/${HOSTFQDN}-SrvKey.pem
+      session                   => undef,
 # Undocumented values
-      defaultVncStartup         => <<SCRIPTEOF
-#! /bin/sh
-
-test x"\$SHELL" = x"" && SHELL=/bin/bash
-test x"\$1"     = x"" && set -- default
-
-vncconfig -iconic &
-"\$SHELL" -l <<EOF
-exec /etc/X11/Xsession "\$@"
-EOF
-vncserver -kill \$DISPLAY
-SCRIPTEOF
-,
-      sessionArgs		=> [],
-      cleanstale		=> 0,
-      clean			=> 0,
-      httpPort			=> undef,
-      displayNumber		=> undef,
-      displayHost		=> undef,
+      cleanstale                => 0,
+      clean                     => 0,
+      httpPort                  => undef,
+      displayNumber             => undef,
+      displayHost               => undef,
     };
 
   #
@@ -1121,22 +1088,18 @@ SCRIPTEOF
     }
   }
   my $vncStartup = $options->{'vncStartup'};
-  undef $options->{'vncStartup'};
+  $options->{'vncStartup'} = '__AUTO__';
   &readConfigFile($options, File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf"));
-  unless (defined $options->{'vncStartup'}) {
+  if (defined($options->{'vncStartup'}) && $options->{'vncStartup'} eq '__AUTO__') {
     # vncStartup was not defined by the user configuration in ~/.vnc/vnc.conf.
     if (-f File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session")) {
-      # A user provided Xvnc-session script exists => user it.
+      # A user provided Xvnc-session script exists => use it.
       $options->{'vncStartup'} =
         File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session");
     } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "xstartup")) {
-      # A user provided Xvnc-session script exists => user it.
+      # A user provided Xvnc-session script exists => use it.
       $options->{'vncStartup'} =
         File::Spec->catfile($options->{'vncUserDir'}, "xstartup");
-    } elsif (!defined $vncStartup) {
-      # vncStartup was not defined by the system configuration in /etc/vnc.conf.
-      $options->{'vncStartup'} =
-        File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session");
     } else {
       # Use the system configuration for vncStartup.
       $options->{'vncStartup'} = $vncStartup;
@@ -1154,6 +1117,12 @@ SCRIPTEOF
   }
 
   {
+    unless (defined $options->{'session'}) {
+      $options->{'session'} = [];
+    }
+    unless (ref($options->{'session'}) eq 'ARRAY') {
+      $options->{'session'} = [split(qr{\s+}, $options->{'session'})];
+    }
     # seperate session args
     {
       my @newargv;
@@ -1161,7 +1130,8 @@ SCRIPTEOF
 
       foreach my $entry (@ARGV) {
         if ( $entry eq '--' ) {
-          $ref = $options->{'sessionArgs'};
+          $options->{'session'} = [];
+          $ref = $options->{'session'};
         } else {
           push @$ref, $entry;
         }
@@ -1230,14 +1200,14 @@ SCRIPTEOF
       'clean'             => \$options->{'clean'},
       'verbose'           => \$options->{'verbose'},
       'dry-run'           => \$options->{'dry-run'},
-      'SecurityTypes=s'	  => \$options->{'SecurityTypes'},
-      'PAMService=s'	  => \$opts{'PAMService'},
-      'PlainUsers=s'	  => \$opts{'PlainUsers'},
-      'passwd=s'	  => \$opts{'vncPasswdFile'},
-      'rfbauth=s'	  => \$opts{'vncPasswdFile'},
-      'PasswordFile=s'	  => \$opts{'vncPasswdFile'},
-      'X509Key=s'	  => \$opts{'X509Key'},
-      'X509Cert=s'	  => \$opts{'X509Cert'},
+      'SecurityTypes=s'   => \$options->{'SecurityTypes'},
+      'PAMService=s'      => \$opts{'PAMService'},
+      'PlainUsers=s'      => \$opts{'PlainUsers'},
+      'passwd=s'          => \$opts{'vncPasswdFile'},
+      'rfbauth=s'         => \$opts{'vncPasswdFile'},
+      'PasswordFile=s'    => \$opts{'vncPasswdFile'},
+      'X509Key=s'         => \$opts{'X509Key'},
+      'X509Cert=s'        => \$opts{'X509Cert'},
       'I-KNOW-THIS-IS-INSECURE' => \$options->{'I-KNOW-THIS-IS-INSECURE'},
       'rfbport=i'         => \$options->{'rfbport'},
     );
@@ -1305,9 +1275,9 @@ SCRIPTEOF
         push @cmd, "-X509Key", $opts{'X509Key'} if defined $opts{'X509Key'};
         push @cmd, "-X509Cert", $opts{'X509Cert'} if defined $opts{'X509Cert'};
         push @cmd, @ARGV;
-        if ($#{$options->{'sessionArgs'}} >= 0) {
+        if ($#{$options->{'session'}} >= 0) {
           push @cmd, '--';
-          push @cmd, @{$options->{'sessionArgs'}};
+          push @cmd, @{$options->{'session'}};
         }
       }
       @cmd = (@cmdPrefix, map { &quotedString($_); } @cmd);
