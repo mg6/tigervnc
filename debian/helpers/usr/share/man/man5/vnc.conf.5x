@@ -2,14 +2,14 @@
 .\" ** The above line should force tbl to be a preprocessor **
 .\" Man page for Xvnc
 .\"
-.\" Copyright (C), 2006 - 2019, Joachim.Falk@gmx.de
+.\" Copyright (C), 2006 - 2020, Joachim.Falk@gmx.de
 .\" Copyright (C), 1998, Marcus.Brinkmann@ruhr-uni-bochum.de
 .\"
 .\" You may distribute under the terms of the GNU General Public
 .\" License as specified in the file COPYING that comes with the
 .\" Debian GNU/Linux distribution.
 .\"
-.TH vnc.conf 5x "Dec 20th, 2019" "TigerVNC 1.10.1" "Virtual Network Computing"
+.TH vnc.conf 5x "Sep 25th, 2020" "TigerVNC 1.10.1" "Virtual Network Computing"
 .SH NAME
 vnc.conf \- configuration file for Virtual Network Computing
 .SH SYNOPSIS
@@ -135,9 +135,34 @@ Contains the filename for the log files directory of Xvnc
 .IR $vncPasswdFile\ \| =\ \| $vncUserDir\ \| .\ " /passwd """;
 Contains the filename of the password file for Xtigervnc. This file is only used for the security types\fB VncAuth\fP,\fB TLSVnc\fP, and\fB X509Vnc\fP.
 .TP
-.IR $vncStartup\ \| =\ " /etc/X11/XSession """;
-Points to a script that will be started at the very beginning of the Xvnc
-session.
+.IR $vncStartup\ \| =\ " /etc/X11/Xvnc-session """;
+Points to a script that will be started at the very beginning when neither
+.I $vncUserDir/Xvnc-session
+nor
+.I $vncUserDir/xstartup
+is present.
+If
+.I $vncUserDir/Xvnc-session
+is present, it will be used. Otherwise, we try
+.I $vncUserDir/xstartup\fP.
+If this is also absent, then we use the
+.I $vncStartup
+script. If
+.I $vncStartup
+is specified in
+.I $vncUserDir/vnc.conf\fP,
+then this script is used unconditionally. That is without checking for the presence of
+.I $vncUserDir/Xvnc-session
+or
+.I $vncUserDir/xstartup\fP.
+.TP
+.IR $session\ \| =\  undef ";
+This specifies the session argument for the
+.I $vncStartup
+script. If this is not specified, then
+.I /etc/X11/Xvnc-session
+will start the session specified by
+.I /usr/bin/x-session-manager\fP.
 .TP
 .IR $xauthorityFile\ \| =\ " $ENV{HOME}/.Xauthority """;
 Specifies the path to the X authority file that should be used
@@ -255,18 +280,18 @@ that usable certificates are present.
 .RE
 .SH FILES
 .TP
-.B /usr/bin/vncserver
+.I /usr/bin/vncserver
 A wrapper script around
 .B Xvnc
 to start the server with appropriate defaults.
 .TP
-.TP
-.B /usr/bin/vncpasswd
+.I /usr/bin/vncpasswd
 Command to create and change password files to be used by the RFB protocol
 (can be specified in the
 .I $vncPasswdFile
 variable).
-.B /usr/bin/Xvnc
+.TP
+.I /usr/bin/Xvnc
 The real server. Will be invoked by vncserver.
 .SH "SEE ALSO"
 .BR Xvnc (1),
@@ -276,6 +301,7 @@ The real server. Will be invoked by vncserver.
 .BR vncviewer (1).
 .
 .SH AUTHOR
+2020 \- Modified for TigerVNC 1.10.1 by Joachim Falk (Joachim.falk@gmx.de)
 2016 \- Modified for TigerVNC 1.7 by Joachim Falk (Joachim.falk@gmx.de)
 2006 \- Modified for vnc 4.1.2 by Joachim Falk (Joachim.falk@gmx.de)
 1998 \- Originally written by Marcus Brinkmann (Marcus.Brinkmann@ruhr-uni-bochum.de)

@@ -8,6 +8,7 @@ tigervnc (1.10.1+dfsg-8~RC2) UNRELEASED; urgency=medium
   * Handle /etc/default/keyboard configuration.
   * Small tweaks to tigervncserver(1) man page.
   * New $session argument in vnc.conf to specify the X session to start.
+  * Improved documentation of vnc.conf.
 
  -- Joachim Falk <joachim.falk@gmx.de>  Sat, 26 Sep 2020 01:42:30 +0200
 
