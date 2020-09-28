@@ -9,7 +9,6 @@ tigervnc-tags
 
 CMakeFiles
 CMakeCache.txt
-*.cmake
 Makefile
 Makefile.in
 config.h

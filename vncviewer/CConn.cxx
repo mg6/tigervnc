@@ -82,7 +82,7 @@ CConn::CConn(const char* vncServerName, network::Socket* socket=NULL)
 
   supportsLocalCursor = true;
   supportsDesktopResize = true;
-  supportsLEDState = true;
+  supportsLEDState = false;
 
   if (customCompressLevel)
     setCompressLevel(::compressLevel);
@@ -266,7 +266,7 @@ void CConn::socketEvent(FL_SOCKET fd, void *data)
        // Also check if we need to stop reading and terminate
        if (should_exit())
          break;
-    } while (cc->sock->inStream().checkNoWait(1));
+    } while (cc->getInStream()->checkNoWait(1));
   } catch (rdr::EndOfStream& e) {
     vlog.info("%s", e.str());
     exit_vncviewer();
