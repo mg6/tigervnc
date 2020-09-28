@@ -1,3 +1,13 @@
+tigervnc (1.10.1+dfsg-9) unstable; urgency=medium
+
+  [ Joachim Falk ]
+  * Properly store certificate exceptions in native and java VNC viewer. The
+    VNC viewers stored the certificate exceptions as authorities, meaning that
+    the owner of a certificate could impersonate any server after a client had
+    added an exception. This is issue CVE-2020-26117 (Closes: #971272).
+
+ -- Joachim Falk <joachim.falk@gmx.de>  Mon, 28 Sep 2020 22:43:11 +0200
+
 tigervnc (1.10.1+dfsg-8) unstable; urgency=medium
 
   [ Antoni Villalonga ]

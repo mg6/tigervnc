@@ -6,7 +6,7 @@
 # dustbin/0176-tigervnc-1.9-fix-crash-on-disconnect.patch # no longer needed for TigerVNC 1.10
 0177-tigervnc-1.10.1-fix-setupShm-wrong-width-heigh-method.patch
 0178-xorg-server-1.20.7-fix-ddxInputThreadInit-link-error.patch
-0179-Fix-saving-of-bad-server-certificates.patch
+#0179-Fix-saving-of-bad-server-certificates.patch # obsoleted by CVE-2020-26117.patch
 # rework/0200-add-tcpwrappers-support.patch # This patch is still not ported
 
 # These patches are lifted from RedHat
@@ -43,3 +43,4 @@ CVE-2014-8241-849478.patch
 #dustbin/CVE-2017-7392-Delete-underlying-ssecurity-in-SSecurityVeNCrypt.patch # applied upstream in TigerVNC 1.8
 #dustbin/CVE-2017-7394-0001-Fix-checkNoWait-logic-in-SSecurityPlain.patch # applied upstream in TigerVNC 1.8
 #dustbin/CVE-2017-7394-0002-Limit-max-username-password-size-in-SSecurityPlain.patch # applied upstream in TigerVNC 1.8
+CVE-2020-26117.patch
