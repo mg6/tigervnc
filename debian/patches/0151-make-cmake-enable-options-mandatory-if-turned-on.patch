@@ -5,8 +5,8 @@ Index: pkg-tigervnc/CMakeLists.txt
 ===================================================================
 --- pkg-tigervnc.orig/CMakeLists.txt
 +++ pkg-tigervnc/CMakeLists.txt
-@@ -136,8 +136,8 @@ endif()
- find_package(ZLIB REQUIRED)
+@@ -141,8 +141,8 @@ find_package(ZLIB REQUIRED)
+ find_package(Pixman REQUIRED)
  
  # Check for gettext
 -option(ENABLE_NLS "Enable translation of program messages" ON)
@@ -16,7 +16,7 @@ Index: pkg-tigervnc/CMakeLists.txt
    # Tools
    find_package(Gettext)
  
-@@ -171,8 +171,14 @@ if(ENABLE_NLS)
+@@ -176,8 +176,14 @@ if(ENABLE_NLS)
    endif()
  
    if(NOT GETTEXT_FOUND OR NOT ICONV_FOUND)
@@ -33,7 +33,7 @@ Index: pkg-tigervnc/CMakeLists.txt
    endif()
  endif()
  
-@@ -248,13 +254,19 @@ if(UNIX AND NOT APPLE)
+@@ -253,13 +259,19 @@ if(UNIX AND NOT APPLE)
  endif()
  
  # Check for GNUTLS library
@@ -55,17 +55,3 @@ Index: pkg-tigervnc/CMakeLists.txt
    endif()
  endif()
  
-@@ -268,7 +280,12 @@ if(ENABLE_PAM)
-   if(HAVE_PAM_H AND HAVE_PAM_START)
-     set(PAM_LIBS pam)
-   else()
--    set(ENABLE_PAM 0)
-+    if(DEFINED ENABLE_PAM)
-+      message(FATAL_ERROR "PAM support requested, but libpam could not be found!")
-+    else()
-+      message(WARNING "PAM NOT found.")
-+      set(ENABLE_PAM 0)
-+    endif()
-   endif()
- endif()
- set(HAVE_PAM ${ENABLE_PAM})
