@@ -27,7 +27,7 @@ Index: pkg-tigervnc/vncviewer/vncviewer.man
 ===================================================================
 --- pkg-tigervnc.orig/vncviewer/vncviewer.man
 +++ pkg-tigervnc/vncviewer/vncviewer.man
-@@ -299,7 +299,7 @@ machine name should be specified as know
+@@ -305,7 +305,7 @@ machine name should be specified as know
  "localhost" denotes the \fIgateway\fR, not the machine where vncviewer
  was launched. The environment variable \fIVNC_VIA_CMD\fR can override
  the default tunnel command of

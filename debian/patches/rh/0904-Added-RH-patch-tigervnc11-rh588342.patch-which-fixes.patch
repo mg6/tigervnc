@@ -17,9 +17,9 @@ Index: pkg-tigervnc/unix/xserver/hw/vnc/Input.c
 ===================================================================
 --- pkg-tigervnc.orig/unix/xserver/hw/vnc/Input.c
 +++ pkg-tigervnc/unix/xserver/hw/vnc/Input.c
-@@ -165,6 +165,9 @@ void vncPointerButtonAction(int buttonMa
+@@ -131,6 +131,9 @@ void vncPointerButtonAction(int buttonMa
+ 	int i;
  	ValuatorMask mask;
- #endif
  
 +	/* Flush event queue to ensure we don't flood it */
 +	mieqProcessInputEvents();
@@ -27,7 +27,7 @@ Index: pkg-tigervnc/unix/xserver/hw/vnc/Input.c
  	for (i = 0; i < BUTTONS; i++) {
  		if ((buttonMask ^ oldButtonMask) & (1 << i)) {
  			int action = (buttonMask & (1<<i)) ?
-@@ -204,6 +207,9 @@ void vncPointerMove(int x, int y)
+@@ -152,6 +155,9 @@ void vncPointerMove(int x, int y)
  	if (cursorPosX == x && cursorPosY == y)
  		return;
  
@@ -36,4 +36,4 @@ Index: pkg-tigervnc/unix/xserver/hw/vnc/Input.c
 +
  	valuators[0] = x;
  	valuators[1] = y;
- #if XORG < 110
+ 	valuator_mask_set_range(&mask, 0, 2, valuators);
