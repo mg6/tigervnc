@@ -5,7 +5,7 @@ Index: pkg-tigervnc/vncviewer/vncviewer.cxx
 ===================================================================
 --- pkg-tigervnc.orig/vncviewer/vncviewer.cxx
 +++ pkg-tigervnc/vncviewer/vncviewer.cxx
-@@ -197,7 +197,7 @@ static void init_fltk()
+@@ -206,7 +206,7 @@ static void init_fltk()
  
    // Proper Gnome Shell integration requires that we set a sensible
    // WM_CLASS for the window.
@@ -22,9 +22,9 @@ Index: pkg-tigervnc/vncviewer/vncviewer.desktop.in.in
  Name=TigerVNC Viewer
  GenericName=Remote Desktop Viewer
  Comment=Connect to VNC server and display remote desktop
--Exec=@BIN_DIR@/vncviewer
+-Exec=@CMAKE_INSTALL_FULL_BINDIR@/vncviewer
 +Keywords=remote desktop;vnc;
-+Exec=@BIN_DIR@/xtigervncviewer
++Exec=@CMAKE_INSTALL_FULL_BINDIR@/xtigervncviewer
  Icon=tigervnc
  Terminal=false
  Type=Application
