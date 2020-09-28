@@ -519,8 +519,7 @@ void VNCSConnectionST::keyEvent(rdr::U32 keysym, rdr::U32 keycode, bool down) {
   // Avoid lock keys if we don't know the server state
   if ((server->getLEDState() == ledUnknown) &&
       ((keysym == XK_Caps_Lock) ||
-       (keysym == XK_Num_Lock) ||
-       (keysym == XK_Scroll_Lock))) {
+       (keysym == XK_Num_Lock))) {
     vlog.debug("Ignoring lock key (e.g. caps lock)");
     return;
   }
@@ -528,13 +527,6 @@ void VNCSConnectionST::keyEvent(rdr::U32 keysym, rdr::U32 keycode, bool down) {
   // Lock key heuristics
   // (only for clients that do not support the LED state extension)
   if (!client.supportsLEDState()) {
-    // Always ignore ScrollLock as we don't have a heuristic
-    // for that
-    if (keysym == XK_Scroll_Lock) {
-      vlog.debug("Ignoring lock key (e.g. caps lock)");
-      return;
-    }
-
     if (down && (server->getLEDState() != ledUnknown)) {
       // CapsLock synchronisation heuristic
       // (this assumes standard interaction between CapsLock the Shift
@@ -661,10 +653,11 @@ void VNCSConnectionST::setDesktopSize(int fb_width, int fb_height,
 {
   unsigned int result;
 
-  if (!accessCheck(AccessSetDesktopSize)) return;
-  if (!rfb::Server::acceptSetDesktopSize) return;
+  if (!accessCheck(AccessSetDesktopSize) || !rfb::Server::acceptSetDesktopSize)
+    result = resultProhibited;
+  else
+    result = server->setDesktopSize(this, fb_width, fb_height, layout);
 
-  result = server->setDesktopSize(this, fb_width, fb_height, layout);
   writer()->writeDesktopSize(reasonClient, result);
 }
 

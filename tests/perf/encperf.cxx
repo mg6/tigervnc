@@ -26,6 +26,8 @@
  * are not encoded in the file and must be specified by the user.
  */
 
+#define __USE_MINGW_ANSI_STDIO 1
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -39,6 +41,7 @@
 
 #include <rfb/CConnection.h>
 #include <rfb/CMsgReader.h>
+#include <rfb/CMsgWriter.h>
 #include <rfb/UpdateTracker.h>
 
 #include <rfb/EncodeManager.h>
@@ -89,7 +92,8 @@ public:
   void getStats(double& ratio, unsigned long long& bytes,
                 unsigned long long& rawEquivalent);
 
-  virtual void initDone();
+  virtual void initDone() {};
+  virtual void resizeFramebuffer();
   virtual void setCursor(int, int, const rfb::Point&, const rdr::U8*);
   virtual void framebufferUpdateStart();
   virtual void framebufferUpdateEnd();
@@ -104,6 +108,7 @@ public:
 
 protected:
   rdr::FileInStream *in;
+  DummyOutStream *out;
   rfb::SimpleUpdateTracker updates;
   class SConn *sc;
 };
@@ -167,12 +172,14 @@ CConn::CConn(const char *filename)
   encodeTime = 0.0;
 
   in = new rdr::FileInStream(filename);
-  setStreams(in, NULL);
+  out = new DummyOutStream;
+  setStreams(in, out);
 
   // Need to skip the initial handshake and ServerInit
   setState(RFBSTATE_NORMAL);
   // That also means that the reader and writer weren't setup
   setReader(new rfb::CMsgReader(this, in));
+  setWriter(new rfb::CMsgWriter(&server, out));
   // Nor the frame buffer size and format
   rfb::PixelFormat pf;
   pf.parse(format);
@@ -188,6 +195,7 @@ CConn::~CConn()
 {
   delete sc;
   delete in;
+  delete out;
 }
 
 void CConn::getStats(double& ratio, unsigned long long& bytes,
@@ -196,7 +204,7 @@ void CConn::getStats(double& ratio, unsigned long long& bytes,
   sc->getStats(ratio, bytes, rawEquivalent);
 }
 
-void CConn::initDone()
+void CConn::resizeFramebuffer()
 {
   rfb::ModifiablePixelBuffer *pb;
 
@@ -493,13 +501,8 @@ int main(int argc, char **argv)
 
   printf("Core usage (total): %g (+/- %g %%)\n", median, meddev);
 
-#ifdef WIN32
-  printf("Encoded bytes: %I64d\n", runs[0].bytes);
-  printf("Raw equivalent bytes: %I64d\n", runs[0].rawEquivalent);
-#else
-  printf("Encoded bytes: %lld\n", runs[0].bytes);
-  printf("Raw equivalent bytes: %lld\n", runs[0].rawEquivalent);
-#endif
+  printf("Encoded bytes: %llu\n", runs[0].bytes);
+  printf("Raw equivalent bytes: %llu\n", runs[0].rawEquivalent);
   printf("Ratio: %g\n", runs[0].ratio);
 
   return 0;

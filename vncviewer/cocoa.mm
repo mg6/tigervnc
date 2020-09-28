@@ -138,6 +138,20 @@ CGColorSpaceRef cocoa_win_color_space(Fl_Window *win)
   return lut;
 }
 
+bool cocoa_win_is_zoomed(Fl_Window *win)
+{
+  NSWindow *nsw;
+  nsw = (NSWindow*)fl_xid(win);
+  return [nsw isZoomed];
+}
+
+void cocoa_win_zoom(Fl_Window *win)
+{
+  NSWindow *nsw;
+  nsw = (NSWindow*)fl_xid(win);
+  [nsw zoom:nsw];
+}
+
 int cocoa_is_keyboard_event(const void *event)
 {
   NSEvent *nsevent;
