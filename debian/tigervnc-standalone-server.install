@@ -2,5 +2,12 @@ usr/bin/Xtigervnc usr/bin
 usr/bin/tigervncserver usr/bin
 etc/tigervnc/ecparams.pem etc/tigervnc
 etc/tigervnc/ssleay.cnf etc/tigervnc
+etc/tigervnc/vncserver-config-defaults etc/tigervnc
+etc/tigervnc/vncserver-config-mandatory etc/tigervnc
+etc/tigervnc/vncserver.users etc/tigervnc
 etc/vnc.conf etc
 etc/X11/Xvnc-session etc/X11
+usr/lib/systemd/system/tigervncserver@.service
+usr/libexec/tigervncserver
+usr/libexec/tigervncsession-start
+usr/sbin/tigervncsession

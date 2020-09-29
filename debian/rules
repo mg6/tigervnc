@@ -158,8 +158,7 @@ override_dh_auto_build:
 override_dh_auto_install:
 	dh_auto_install -D$(TIGERVNC_SRCDIR) -B$(TIGERVNC_BUILDDIR)
 	dh_auto_install -D$(XTIGERVNC_SRCDIR) -B$(XTIGERVNC_BUILDDIR)
-	mkdir -p $(DEB_DESTDIR)/usr/share/doc
-	mv $(DEB_DESTDIR)/usr/share/doc/tigervnc-* \
+	mv $(DEB_DESTDIR)/usr/share/doc/tigervnc \
 	  $(DEB_DESTDIR)/usr/share/doc/tigervnc-common
 	mv $(DEB_DESTDIR)/usr/bin/vncviewer \
 	  $(DEB_DESTDIR)/usr/bin/xvncviewer
@@ -179,7 +178,7 @@ override_dh_auto_install:
 	cp debian/tigervnc_16.png \
 	  $(DEB_DESTDIR)/usr/share/icons/hicolor/16x16/apps/tigervnc.png
 	cd $(DEB_DESTDIR) && \
-	  find usr/bin usr/share/man usr/share/applications -name "*vnc*" | \
+	  find usr/bin usr/sbin usr/lib/systemd/system usr/libexec usr/share/man usr/share/applications -name "*vnc*" | \
 	  while read line; do \
 	    echo Rename "$$line" `echo "$$line" | sed -e 's/vnc/tigervnc/g'` ; \
 	    mv "$$line" `echo "$$line" | sed -e 's/vnc/tigervnc/g'`; \
@@ -192,9 +191,11 @@ override_dh_auto_install:
 	      -e 's/\<vncpasswd\>/tigervncpasswd/g' \
 	      -e 's/\<vncconfig\>/tigervncconfig/g' \
 	      -e 's/\<vncserver\>/tigervncserver/g' \
+	      -e 's/\<vncsession\>/tigervncsession/g' \
 	      -e 's/\<x0vncserver\>/x0tigervncserver/g' \
 	      -e 's/\<Xvnc\>/Xtigervnc/g' \
 	      -e 's/\<Xtigervnc-session\>/Xvnc-session/g' \
+	      -e 's/\<tigervnc\/tigervnc/tigervnc\/vnc/g' \
 	      $$line | \
 	    gzip -9 > $$line.gz; \
 	  rm -f $$line; \
