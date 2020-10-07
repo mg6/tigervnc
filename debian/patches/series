@@ -1,3 +1,6 @@
+0000-find-fltk-libs.patch
+0001-x0vncserver-build-make-missing-libraries-fatal-errors.patch
+0002-fix-linking.patch
 0010-fix-xtigervnc-build.patch
 0020-buildtime-from-debian-changelog.patch
 0102-fix-spelling-error-in-manpages-to-shutup-lintian.patch
@@ -17,10 +20,6 @@ rh/tigervnc-cursor.patch
 rh/tigervnc-working-tls-on-fips-systems.patch
 #rh/dustbin/0001-rpath-hack.patch # Hopefully Vendor neutral GL dispatch makes this hack obsolete
 #rh/dustbin/tigervnc-xserver119.patch # buster has xserver120 and TigerVNC 1.9 comes with official support for it
-
-find-fltk-libs.diff
-x0vncserver-build-make-missing-libraries-fatal-errors.diff
-fix-linking.diff
 
 # The following patches are security fixes
 CVE-2014-8240-849479.patch

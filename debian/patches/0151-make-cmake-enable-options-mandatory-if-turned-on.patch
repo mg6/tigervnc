@@ -33,7 +33,7 @@ Index: pkg-tigervnc/CMakeLists.txt
    endif()
  endif()
  
-@@ -253,13 +259,19 @@ if(UNIX AND NOT APPLE)
+@@ -261,13 +267,19 @@ if(UNIX AND NOT APPLE)
  endif()
  
  # Check for GNUTLS library
