@@ -18,6 +18,10 @@ if [ "$1" = "configure" ]; then
   done
 fi
 
+dpkg-maintscript-helper mv_conffile \
+  /etc/X11/Xvnc-session /etc/X11/Xtigervnc-session \
+  1.10.1+dfsg-9 tigervnc-standalone-server -- "$@"
+
 #DEBHELPER#
 
 exit 0

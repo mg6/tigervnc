@@ -194,7 +194,6 @@ override_dh_auto_install:
 	      -e 's/\<vncsession\>/tigervncsession/g' \
 	      -e 's/\<x0vncserver\>/x0tigervncserver/g' \
 	      -e 's/\<Xvnc\>/Xtigervnc/g' \
-	      -e 's/\<Xtigervnc-session\>/Xvnc-session/g' \
 	      -e 's/\<tigervnc\/tigervnc/tigervnc\/vnc/g' \
 	      $$line | \
 	    gzip -9 > $$line.gz; \

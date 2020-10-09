@@ -13,8 +13,8 @@ if test -r /etc/default/keyboard &&
     "${XKBOPTIONS}"
 fi
 
-vncconfig -iconic &
+tigervncconfig -iconic &
 "$SHELL" -l <<EOF
 exec /etc/X11/Xsession "$@"
 EOF
-vncserver -kill $DISPLAY
+tigervncserver -kill $DISPLAY

@@ -828,7 +828,7 @@ sub startXvncServer {
     print "Log file is $desktopLog\n\n";
   } elsif ($options->{'fg'} || $options->{'autokill'}) {
     # Nothing to start and I should also kill the Xtigervnc server when the
-    # Xvnc-session terminates. Well, lets do so. What a pointless exercise.
+    # Xtigervnc-session terminates. Well, lets do so. What a pointless exercise.
     &killXvncServer($options, $runningUserVncservers, [$options->{'displayNumber'}]);
   }
 
@@ -957,7 +957,7 @@ sub usage {
     $prefix."[-fg]                  No daemonization and\n".
     $prefix."                       kill the VNC server after its X session has terminated\n".
     $prefix."[-autokill]            Kill the VNC server after its X session has terminated\n".
-    $prefix."[-noxstartup]          Do not run the Xvnc-session script after launching Xtigervnc\n".
+    $prefix."[-noxstartup]          Do not run the Xtigervnc-session script\n".
     $prefix."[-xstartup]            Specify the script to start after launching Xtigervnc\n".
     $prefix."[-fp fontpath]         Colon separated list of font locations\n".
     $prefix."[-cleanstale]          Do not choke on a stale lockfile\n".
@@ -978,7 +978,7 @@ sub usage {
     $prefix."[-X509Cert]            Path to the X509 certificate in PEM format. This is used by\n".
     $prefix."                       the security types X509None, X509Vnc, and X509Plain.\n".
     $prefix."<X11-options ...>      Further options for Xtigervnc(1)\n".
-    $prefix."[-- sessiontype]       Arguments for the VNC startup script Xvnc-session\n\n".
+    $prefix."[-- sessiontype]       Arguments for the VNC startup script Xtigervnc-session\n\n".
 
     "  $PROG -kill                  Kill a VNC server\n".
     $prefix."[:<number>|:*]         VNC server to kill, * for all\n".
@@ -1032,7 +1032,7 @@ sub main {
       vncPasswdFile             =>
         undef, # later derived from vncUserDir
       vncStartup                =>
-        "/etc/X11/Xvnc-session",
+        "/etc/X11/Xtigervnc-session",
       xauthorityFile            =>
         $ENV{XAUTHORITY} ||
         File::Spec->catfile($ENV{HOME}, ".Xauthority"),
@@ -1092,12 +1092,27 @@ sub main {
   &readConfigFile($options, File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf"));
   if (defined($options->{'vncStartup'}) && $options->{'vncStartup'} eq '__AUTO__') {
     # vncStartup was not defined by the user configuration in ~/.vnc/vnc.conf.
-    if (-f File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session")) {
-      # A user provided Xvnc-session script exists => use it.
+    if (-f File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session")) {
+      # A user provided Xtigervnc-session script exists => use it.
       $options->{'vncStartup'} =
-        File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session");
+        File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session");
+    } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session")) {
+      # This is deprecated rename it to Xtigervnc-session.
+      if (rename
+          File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session")
+        , File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session")) {
+        symlink "Xtigervnc-session"
+          , File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session");
+        # A user provided Xtigervnc-session script exists => use it.
+        $options->{'vncStartup'} =
+          File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session");
+      } else {
+        # A user provided Xtigervnc-session script exists => use it.
+        $options->{'vncStartup'} =
+          File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session");
+      }
     } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "xstartup")) {
-      # A user provided Xvnc-session script exists => use it.
+      # A user provided Xtigervnc-session script exists => use it.
       $options->{'vncStartup'} =
         File::Spec->catfile($options->{'vncUserDir'}, "xstartup");
     } else {
