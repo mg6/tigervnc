@@ -1,13 +1,30 @@
-# /etc/vnc.conf written by Joachim Falk. This file is in the Public Domain.
+# /etc/tigervnc/vncserver-config-defaults written by Joachim Falk. This file is
+# in the Public Domain.
 #
 # This is the configuration file for the tigervnc-standalone-server package.
-# It is Perl syntax and is source from the tigervncserver script.
-# Every value has suitable defaults, so you probably don't need any modifications.
+# It is Perl syntax and is source from the tigervncserver script. Every value
+# has suitable defaults, so you probably don't need any modifications.
 #
-# After this file, $(HOME)/.vnc/vnc.conf will be sourced, so values can be
-# overwritten on a per-user basis. If you want to reactivate the default
-# value there, you have to specify an undef value. For example, $fontPath
-# will set to the default value after
+# After this file, $ENV{HOME}/.vnc/tigervnc.conf will be sourced, so values can
+# be overwritten on a per-user basis.
+#
+# Next, command-line options overwrite the settings in both this file as well as
+# the user's tigervnc.conf config file.
+#
+# Finally, /etc/tigervnc/vncserver-config-mandatory is parsed. If this file
+# exists and defines options to be passed to Xtigervnc, they will override any
+# of the same options defined in a user's tigervnc.conf file as well as options
+# given via the command line. The vncserver-config-mandatory file offers a
+# mechanism to establish some basic form of system-wide policy.
+#
+# ******************************************************************************
+# * WARNING! There is nothing stopping users from constructing their own start *
+# * script that calls Xtigervnc directly to bypass any options defined in      *
+# * /etc/tigervnc/vncserver-config-mandatory.                                  *
+# ******************************************************************************
+#
+# If you want to reactivate default values, you have to specify an undef value.
+# For example, $fontPath will set to the default value after
 #
 # $fontPath = "/foo";
 # $fontPath = undef;
@@ -77,7 +94,7 @@ $fontPath = undef;
 # ------------------
 #
 # This section contains entries that may change from user to user.
-# You can overwrite these settings by providing a ~/.vnc/vnc.conf
+# You can overwrite these settings by providing a ~/.vnc/tigervnc.conf
 # configuration file.
 
 # $vncUserDir contains the filename for the log files directory of Xtigervnc
@@ -95,7 +112,7 @@ $fontPath = undef;
 # when neither $vncUserDir/Xtigervnc-session nor $vncUserDir/xstartup is present.
 # If $vncUserDir/Xtigervnc-session is present, it will be used. Otherwise, we try
 # $vncUserDir/xstartup. If this is also absent, then we use the script given by
-# $vncStartup. If $vncStartup is specified in $vncUserDir/vnc.conf, then this
+# $vncStartup. If $vncStartup is specified in $vncUserDir/tigervnc.conf, then this
 # script is used unconditionally. That is without checking for the presence of
 # $vncUserDir/Xtigervnc-session or $vncUserDir/xstartup.
 #

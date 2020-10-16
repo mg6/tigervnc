@@ -1,4 +1,15 @@
-.TH tigervncserver 1 "Sep 25th, 2020" "TigerVNC 1.10.1" "Virtual Network Computing"
+'\" t
+.\" ** The above line should force tbl to be a preprocessor **
+.\" Man page for tigervncserver
+.\"
+.\" Copyright (C) 2016 - 2020 Joachim.Falk@gmx.de
+.\" Copyright (C) Tristan Richardson RealVNC Ltd. and others.
+.\"
+.\" You may distribute under the terms of the GNU General Public
+.\" License as specified in the file COPYING that comes with the
+.\" Debian GNU/Linux distribution.
+.\"
+.TH tigervncserver 1 "Oct 16th, 2020" "TigerVNC 1.11.0" "Virtual Network Computing"
 .SH NAME
 tigervncserver \- start or stop a TigerVNC server
 .SH SYNOPSIS
@@ -82,14 +93,19 @@ Moreover, a username and a hostname can be given to start the tigervncserver via
 tigervncserver franz@kopernikus:13
 .RE
 
-Note that this\fB requires the same version\fP of the tigervncserver wrapper script on the remote machine as is on the local machine.
+Note that this \fBrequires the same version\fP of the tigervncserver wrapper script on the remote machine as is on the local machine.
 .
-System defaults for this wrapper script are found in /etc/vnc.conf.
-This defaults can be overwritten by the user defaults given in $HOME/.vnc/vnc.conf.
-Finally, commandline options have the highest priority overwriting the settings in both /etc/vnc.conf and $HOME/.vnc/vnc.conf.
+Creating the file $HOME/.vnc/Xtigervnc-session allows you to change the applications run at startup (but note that this will not affect an existing desktop).
 .
-Editing the file $HOME/.vnc/Xtigervnc-session allows you to change the applications run at startup (but note that this will not affect an existing desktop).
+System defaults for this wrapper script are found in \fI/etc/tigervnc/vncserver-config-defaults\fP.
+These defaults can be overwritten by the user defaults given in \fI$HOME/.vnc/tigervnc.conf\fP.
+Next, command-line options overwrite the settings in both \fI/etc/tigervnc/vncserver-config-defaults\fP and \fI$HOME/.vnc/tigervnc.conf\fP.
 .
+Finally, options from \fI/etc/tigervnc/vncserver-config-mandatory\fP have the highest priority overwriting all previous settings.
+
+\fBWARNING! There is nothing stopping users from constructing their own wrapper
+script that calls Xtigervnc directly to bypass any options defined in
+/etc/tigervnc/vncserver-config-mandatory.\fP
 .SH OPTIONS
 You can get a list of options by giving \fB\-h\fP as an option to tigervncserver.
 In addition to the options listed below, any unrecognized options will be passed to Xtigervnc \(en see the
@@ -248,7 +264,7 @@ The default password file is $HOME/.vnc/passwd.
 .TP
 .B \-X509Cert\fP \fIcert-path\fP and\fB \-X509Key\fP \fIkey-path\fP
 Path to a X509 certificate in PEM format to be used for all X509 based security types (X509None, X509Vnc, etc.) as well as its private key also in PEM format.
-If the certificate and its key are not provided via the\fB \-X509Cert\fP and\fB \-X509Key\fP commandline options or their corresponding configuration parameters in /etc/vnc.conf or $HOME/.vnc/vnc.conf, then the tigervncserver wrapper script auto generates a self signed certificate.
+If the certificate and its key are not provided via the\fB \-X509Cert\fP and\fB \-X509Key\fP command-line options or their corresponding configuration parameters in /etc/vnc.conf or $HOME/.vnc/tigervnc.conf, then the tigervncserver wrapper script auto generates a self signed certificate.
 The auto generated self signed certificates are stored in the files $HOME/.vnc/\fIhost\fP-SrvCert.pem and $HOME/.vnc/\fIhost\fP-SrvKey.pem.
 .
 .TP
@@ -271,48 +287,60 @@ If a\fI host\fP is specified, then tigervncserver will use SSH to list Xtigervnc
 Stale entries are marked with (stale) in the output.
 .
 .SH FILES
-Several TigerVNC-related files are found in the directory $HOME/.vnc:
+Several TigerVNC-related files are found in the \fI$HOME/.vnc\fP directory:
 .TP
-$HOME/.vnc/vnc.conf
+.I ~/.vnc/tigervnc.conf
 The user configuration file for tigervncserver.
 .TP
-$HOME/.vnc/Xtigervnc-session
+.I ~/.vnc/Xtigervnc-session
 A shell script specifying X applications to be run when a TigerVNC desktop is started.
-If it doesn't exist and no system default is provided in /etc/vnc.conf, tigervncserver will create a new one which runs a couple of basic applications.
-To be compatible with older versions of this wrapper script, we will also use the file $HOME/.vnc/xstartup if it is present.
+To be compatible with older versions of this wrapper script, we will also use the file \fI~/.vnc/xstartup\fP if it is present.
+If it doesn't exist, the system default provided in \fI/etc/tigervnc/vncserver-config-defaults\fP is used.
+A mandatory start script can also be given in \fI/etc/tigervnc/vncserver-config-mandatory\fP.
 .TP
-$HOME/.vnc/passwd
+.I ~/.vnc/passwd
 The TigerVNC password file for the security types VncAuth, TLSVnc, and X509Vnc.
 .TP
-$HOME/.vnc/\fIhost\fP:\fIdisplay#\fP.log
+.I ~/.vnc/<host>:<display#>.log
 The log file for Xtigervnc and applications started in Xtigervnc-session.
 .TP
-$HOME/.vnc/\fIhost\fP:\fIdisplay#\fP.pid
+.I ~/.vnc/<host>:<display#>.pid
 Identifies the Xtigervnc process ID, used by the\fB \-kill\fP option.
 .TP
-$HOME/.vnc/\fIhost\fP-SrvCert.pem and $HOME/.vnc/\fIhost\fP-SrvKey.pem
+.I ~/.vnc/<host>-SrvCert.pem\fP and \fI<host>-SrvKey.pem
 The security types X509None, X509Vnc, and X509Plain need a certificate and the corresponding private key.
-If these are not provided via the\fB \-X509Cert\fP and \-X509Key commandline options or their corresponding configuration parameters in /etc/vnc.conf or $HOME/.vnc/vnc.conf, then the tigervncserver wrapper script auto generates a self signed certificate for the\fB \-X509Cert\fP and\fB \-X509Key\fP options of the Xtigervnc server.
+If these are not provided via the\fB \-X509Cert\fP and \-X509Key command-line options or their corresponding configuration parameters in /etc/vnc.conf or $HOME/.vnc/tigervnc.conf, then the tigervncserver wrapper script auto generates a self signed certificate for the\fB \-X509Cert\fP and\fB \-X509Key\fP options of the Xtigervnc server.
 The auto generated self signed certificates are stored in the above given two files.
 If the user wants their own certificate \(en instead of the on demand auto generated one \(en they can either specify it via the\fB \-X509Cert\fP and\fB \-X509Key\fP options to the tigervncserver wrapper script or replace the auto generated files $HOME/.vnc/\fIhost\fP-SrvCert.pem and $HOME/.vnc/\fIhost\fP-SrvKey.pem.
 These files will not be overwritten once generated by the tigervncserver wrapper script.
 .PP
-Furthermore, there is a global configuration file for tigervncserver:
+Furthermore, there are global configuration files for tigervncserver in the \fI/etc/tigervnc\fP directory:
 .TP
-/etc/vnc.conf
-The global configuration file for tigervncserver.
+.I /etc/tigervnc/vncserver-config-defaults
+The global configuration file specifying the defaults for tigervncserver.
+.TP
+.I /etc/tigervnc/vncserver-config-mandatory
+If this file exists and defines options to be passed to Xtigervnc, they will
+override any of the same options defined in a user's \fItigervnc.conf\fP file. This
+file offers a mechanism to establish some basic form of system-wide policy.
+
+\fBWARNING! There is nothing stopping users from constructing their own start
+script that calls Xtigervnc directly to bypass any options defined in
+/etc/tigervnc/vncserver-config-mandatory.\fP
 .
 .SH SEE ALSO
-.BR vnc.conf (5x),
-.BR xtigervncviewer (1),
-.BR tigervncpasswd (1),
+.BR tigervnc.conf (5x),
 .BR tigervncconfig (1),
-.BR Xtigervnc (1)
+.BR tigervncpasswd (1),
+.BR tigervncsession (8),
+.BR x0tigervncserver (1),
+.BR Xtigervnc (1),
+.BR xtigervncviewer (1)
 .br
 http://www.tigervnc.org
 .
 .SH AUTHOR
-Tristan Richardson, RealVNC Ltd., Joachim Falk and others.
+Joachim Falk, Tristan Richardson, RealVNC Ltd., and others.
 .
 VNC was originally developed by the RealVNC team while at Olivetti
 Research Ltd / AT&T Laboratories Cambridge.  TightVNC additions were

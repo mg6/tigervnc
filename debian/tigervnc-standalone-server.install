@@ -5,7 +5,6 @@ etc/tigervnc/ssleay.cnf etc/tigervnc
 etc/tigervnc/vncserver-config-defaults etc/tigervnc
 etc/tigervnc/vncserver-config-mandatory etc/tigervnc
 etc/tigervnc/vncserver.users etc/tigervnc
-etc/vnc.conf etc
 etc/X11/Xtigervnc-session etc/X11
 usr/lib/systemd/system/tigervncserver@.service
 usr/libexec/tigervncserver

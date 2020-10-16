@@ -82,14 +82,12 @@ use Time::HiRes qw(usleep);
 use Errno qw(:POSIX);
 use POSIX ":sys_wait_h";
 
-use vars qw($HOST $HOSTFQDN $USER $PROG %CMDS);
-
 #
 # Set global constants
 #
 
 # Get the program name
-$PROG = basename($0);
+our $PROG = basename($0);
 
 sub installPackageError {
   my ($package) = @_;
@@ -99,6 +97,9 @@ sub installPackageError {
 
 sub getCommand {
   my ($cmd) = @_;
+
+  our %CMDS;
+
   return $CMDS{$cmd} if defined $CMDS{$cmd};
   print STDERR "$PROG: Couldn't find \"$cmd\" on your PATH.\n";
   &installPackageError("tigervnc-common") if $cmd eq 'tigervncpasswd';
@@ -111,6 +112,8 @@ sub getCommand {
 # Routine to make sure we're operating in a sane environment.
 #
 sub sanityCheck {
+  our %CMDS;
+
   # Get install base bin dir
   my $binbase = dirname(File::Spec->rel2abs($0));
 
@@ -147,6 +150,24 @@ cmd:
     exit 1;
   }
 }
+
+#
+# Next, make sure we're operating in a sane environment.
+#
+&sanityCheck();
+
+# Get the hostname
+our ($HOST, $HOSTFQDN);
+{
+  my $hostname= getCommand("hostname");
+  chomp($HOST     = `$hostname`);
+  chomp($HOSTFQDN = `$hostname -f`);
+}
+# Get the username
+our $USER;
+chomp($USER = `/usr/bin/id -u -n`);
+
+our $SYSTEMCONFIGDIR = "/etc/tigervnc";
 
 sub readConfigFile {
   my $options = shift;
@@ -681,8 +702,8 @@ sub CreateX509Cert {
       exit 1;
     }
     my $configSSLFh;
-    unless (defined open($configSSLFh, "<", "/etc/tigervnc/ssleay.cnf")) {
-      print STDERR "Can't open openssl configuration template /etc/tigervnc/ssleay.cnf: $!\n";
+    unless (defined open($configSSLFh, "<", "$SYSTEMCONFIGDIR/ssleay.cnf")) {
+      print STDERR "Can't open openssl configuration template $SYSTEMCONFIGDIR/ssleay.cnf: $!\n";
       exit 1;
     }
     while (my $line = <$configSSLFh>) {
@@ -704,7 +725,6 @@ sub CreateX509Cert {
 sub startXvncServer {
   my ($options) = @_;
   my $vncStartup = $options->{'vncStartup'};
-  my $xstartupArg= $options->{'xstartupArgSpecified'};
   my $rfbport    = 5900 + $options->{'displayNumber'};
   my $desktopLog = &desktopLog($options);
   my $pidFile    = &pidFile($options);
@@ -995,20 +1015,6 @@ sub usage {
 
 sub main {
   #
-  # First make sure we're operating in a sane environment.
-  #
-  &sanityCheck();
-
-  # Get the hostname
-  {
-    my $hostname= getCommand("hostname");
-    chomp($HOST     = `$hostname`);
-    chomp($HOSTFQDN = `$hostname -f`);
-  }
-  # Get the username
-  chomp($USER = `/usr/bin/id -u -n`);
-
-  #
   # Global options.  You may want to configure some of these for your site.
   # Use /etc/vnc.conf and ~/.vnc/vnc.conf for this purpose.
   #
@@ -1024,7 +1030,7 @@ sub main {
         undef, # Use vnc if /etc/pam.d/vnc exists. Otherwise,
                # use our own /etc/pam.d/tigervnc as fallback.
       sslAutoGenCertCommand     =>
-        "openssl req -newkey ec:/etc/tigervnc/ecparams.pem -x509 -days 2190 -nodes",
+        "openssl req -newkey ec:$SYSTEMCONFIGDIR/ecparams.pem -x509 -days 2190 -nodes",
 ## Values declared as user values in /etc/vnc.conf, i.e., values
 ## that are intended to be overwritten by ~/.vnc/vnc.conf.
       vncUserDir                =>
@@ -1071,10 +1077,10 @@ sub main {
   #
   {
     my $tmpOpt = { XFConfigPath => $options->{'XFConfigPath'} };
-    &readConfigFile($tmpOpt, "/etc/vnc.conf");
+    &readConfigFile($tmpOpt, "$SYSTEMCONFIGDIR/vncserver-config-defaults");
     &readXFConfig($options, $tmpOpt->{'XFConfigPath'});
   }
-  &readConfigFile($options, "/etc/vnc.conf");
+  &readConfigFile($options, "$SYSTEMCONFIGDIR/vncserver-config-defaults");
 
   if (!(-d $options->{'vncUserDir'})) {
     # Create the user's vnc directory if necessary.
@@ -1089,48 +1095,28 @@ sub main {
   }
   my $vncStartup = $options->{'vncStartup'};
   $options->{'vncStartup'} = '__AUTO__';
-  &readConfigFile($options, File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf"));
-  if (defined($options->{'vncStartup'}) && $options->{'vncStartup'} eq '__AUTO__') {
-    # vncStartup was not defined by the user configuration in ~/.vnc/vnc.conf.
-    if (-f File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session")) {
-      # A user provided Xtigervnc-session script exists => use it.
-      $options->{'vncStartup'} =
-        File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session");
-    } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session")) {
-      # This is deprecated rename it to Xtigervnc-session.
-      if (rename
-          File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session")
-        , File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session")) {
-        symlink "Xtigervnc-session"
-          , File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session");
-        # A user provided Xtigervnc-session script exists => use it.
-        $options->{'vncStartup'} =
-          File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session");
-      } else {
-        # A user provided Xtigervnc-session script exists => use it.
-        $options->{'vncStartup'} =
-          File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session");
-      }
-    } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "xstartup")) {
-      # A user provided Xtigervnc-session script exists => use it.
-      $options->{'vncStartup'} =
-        File::Spec->catfile($options->{'vncUserDir'}, "xstartup");
+
+  my $vncUserConfig = undef;
+  if (-f File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf")) {
+    # User provided TigerVNC configuration found
+    $vncUserConfig = File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf");
+  } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf")) {
+    # This is deprecated rename it to tigervnc.conf
+    if (rename
+        File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf")
+      , File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf")) {
+      symlink "tigervnc.conf"
+        , File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf");
+      # User provided TigerVNC configuration found
+      $vncUserConfig = File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf");
     } else {
-      # Use the system configuration for vncStartup.
-      $options->{'vncStartup'} = $vncStartup;
+      # User provided TigerVNC configuration found
+      $vncUserConfig = File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf");
     }
   }
-  unless (defined $options->{'vncPasswdFile'}) {
-    $options->{'vncPasswdFile'} =
-      File::Spec->catfile($options->{'vncUserDir'}, "passwd");
+  if (defined $vncUserConfig) {
+    &readConfigFile($options, $vncUserConfig);
   }
-  if (! defined $options->{'vncClasses'}) {
-    $options->{'vncClasses'} = "/var/www/vnc" if -d "/var/www/vnc";
-  } elsif (! -d $options->{'vncClasses'}) {
-    print STDERR "VNC class files can not be found at $options->{'vncClasses'}.";
-    exit 1;
-  }
-
   {
     unless (defined $options->{'session'}) {
       $options->{'session'} = [];
@@ -1183,15 +1169,16 @@ sub main {
       'list'              => \$opts{'list'},
       'fg'                => \$opts{'fg'},
       'autokill'          => \$opts{'autokill'},
-      'noxstartup'        => \$opts{'noxstartup'},
+      'noxstartup'        => sub {
+          $opts{'noxstartup'} = 1;
+          $opts{'vncStartup'} = undef;
+        },
       'xstartup:s'        => sub {
           $opts{'noxstartup'} = 0;
           if ($_[1] eq '') {
             $opts{'vncStartup'} = undef;
-            $opts{'xstartupArgSpecified'} = undef;
           } else {
             $opts{'vncStartup'} = $_[1];
-            $opts{'xstartupArgSpecified'} = 1;
           }
         },
       'xdisplaydefaults'  => sub {
@@ -1249,7 +1236,6 @@ sub main {
     } else {
       $options->{'displayHost'}   = $HOSTFQDN;
     }
-
     if ($options->{'displayHost'} ne $HOST &&
         $options->{'displayHost'} ne $HOSTFQDN) {
       my @cmdPrefix = ("ssh", "$options->{'displayHost'}", "tigervncserver");
@@ -1274,7 +1260,7 @@ sub main {
         push @cmd, "-fp", $opts{'fp'} if $opts{'fp'};
         push @cmd, "-fg" if $opts{'fg'};
         push @cmd, "-noxstartup" if $opts{'noxstartup'};
-        push @cmd, "-xstartup", $opts{'vncStartup'} if !$opts{'noxstartup'} && defined $opts{'vncStartup'};
+        push @cmd, "-xstartup", $opts{'vncStartup'} if defined $opts{'vncStartup'};
         push @cmd, "-autokill" if $opts{'autokill'};
         push @cmd, "-httpPort", $options->{'httpPort'} if ($options->{'httpPort'});
         push @cmd, "-rfbport", $options->{'rfbport'} if ($options->{'rfbport'});
@@ -1309,6 +1295,52 @@ sub main {
       exit 0;
     }
 
+    foreach my $key (keys %opts) {
+      $options->{$key} = $opts{$key} if defined $opts{$key};
+    }
+    if ($opts{'noxstartup'}) {
+      $options->{'vncStartup'} = undef;
+    }
+    delete $options->{'noxstartup'};
+    if (defined $opts{'vncPasswdFile'}) {
+      $options->{'passwordArgSpecified'} = 1;
+    } else {
+      $options->{'passwordArgSpecified'} = 0;
+    }
+  }
+  {
+    &readConfigFile($options, "$SYSTEMCONFIGDIR/vncserver-config-mandatory");
+    if (defined($options->{'vncStartup'}) && $options->{'vncStartup'} eq '__AUTO__') {
+      # vncStartup was not defined by the user configuration in ~/.vnc/vnc.conf.
+      if (-f File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session")) {
+        # A user provided Xtigervnc-session script exists => use it.
+        $options->{'vncStartup'} =
+          File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session");
+      } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session")) {
+        # This is deprecated rename it to Xtigervnc-session.
+        if (rename
+            File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session")
+          , File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session")) {
+          symlink "Xtigervnc-session"
+            , File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session");
+          # A user provided Xtigervnc-session script exists => use it.
+          $options->{'vncStartup'} =
+            File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session");
+        } else {
+          # A user provided Xtigervnc-session script exists => use it.
+          $options->{'vncStartup'} =
+            File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session");
+        }
+      } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "xstartup")) {
+        # A user provided Xtigervnc-session script exists => use it.
+        $options->{'vncStartup'} =
+          File::Spec->catfile($options->{'vncUserDir'}, "xstartup");
+      } else {
+        # Use the system configuration for vncStartup.
+        $options->{'vncStartup'} = $vncStartup;
+      }
+    }
+
     unless (defined $options->{'PlainUsers'}) {
       chomp($options->{'PlainUsers'} = `/usr/bin/id -u -n`);
     }
@@ -1321,17 +1353,18 @@ sub main {
       }
     }
 
-    foreach my $key (keys %opts) {
-      $options->{$key} = $opts{$key} if defined $opts{$key};
+    unless (defined $options->{'vncPasswdFile'}) {
+      $options->{'vncPasswdFile'} =
+        File::Spec->catfile($options->{'vncUserDir'}, "passwd");
     }
-    if ($opts{'noxstartup'}) {
-      $options->{'vncStartup'} = undef;
-      $options->{'xstartupArgSpecified'} = undef;
+    if (! defined $options->{'vncClasses'}) {
+      $options->{'vncClasses'} = "/var/www/vnc" if -d "/var/www/vnc";
+    } elsif (! -d $options->{'vncClasses'}) {
+      print STDERR "VNC class files can not be found at $options->{'vncClasses'}.";
+      exit 1;
     }
-    if (defined $opts{'vncPasswdFile'}) {
-      $options->{'passwordArgSpecified'} = 1;
-    } else {
-      $options->{'passwordArgSpecified'} = 0;
+    unless (ref($options->{'session'}) eq 'ARRAY') {
+      $options->{'session'} = [split(qr{\s+}, $options->{'session'})];
     }
     if (defined $options->{'localhost'}) {
       $options->{'localhost'} = $options->{'localhost'} =~ m/^(?:yes|true|1)$/i;

@@ -2,7 +2,11 @@
 # certificate for the -X509Cert and -X509Key options of the Xtigervnc server.
 # The magic @HostName@ value is substituted by the fully qualified domain name
 # of the machine. The openssl command used to auto generate the certificate is
-# specified in /etc/vnc.conf with the $sslAutoGenCertCommand option.
+# specified with the $sslAutoGenCertCommand option given in a tigervnc.conf
+# file. That is in one of the three configuration files listed below.
+# - /etc/tigervnc/vncserver-config-defaults
+# - ~/.vnc/tigervnc.conf
+# - /etc/tigervnc/vncserver-config-mandatory
 #
 # If the user wants their own certificate, instead of the on demand auto
 # generated one, they can either specify it via the -X509Cert and -X509Key

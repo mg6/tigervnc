@@ -1,17 +1,17 @@
 '\" t
 .\" ** The above line should force tbl to be a preprocessor **
-.\" Man page for Xvnc
+.\" Man page for tigervnc.conf
 .\"
-.\" Copyright (C), 2006 - 2020, Joachim.Falk@gmx.de
-.\" Copyright (C), 1998, Marcus.Brinkmann@ruhr-uni-bochum.de
+.\" Copyright (C) 2006 - 2020 Joachim.Falk@gmx.de
+.\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
 .\"
 .\" You may distribute under the terms of the GNU General Public
 .\" License as specified in the file COPYING that comes with the
 .\" Debian GNU/Linux distribution.
 .\"
-.TH vnc.conf 5x "Sep 25th, 2020" "TigerVNC 1.10.1" "Virtual Network Computing"
+.TH tigervnc.conf 5x "Oct 16th, 2020" "TigerVNC 1.11.0" "Virtual Network Computing"
 .SH NAME
-vnc.conf \- configuration file for Virtual Network Computing
+tigervnc.conf \- configuration files for Virtual Network Computing
 .SH SYNOPSIS
 .IR $variable\ \| =\ " someValue """;
 
@@ -22,24 +22,41 @@ vnc.conf \- configuration file for Virtual Network Computing
 .IR $variable\ \| =\ \| $var1\ \| .\ \| $var2 ;
 
 .SH DESCRIPTION
-.I /etc/vnc.conf
-is the site wide configuration file for
-.BR vncserver (1),
+This man page describes the syntax and options of the three configuration files
+loaded by 
+.BR tigervncserver (1),
 the free X server for
 .B Virtual Network Computing
-(VNC). It can be used to change the behavior of the server at startup time,
-although for all values suitable defaults are preset.
+(VNC). These configuration files can be used to change the behavior of the
+server at startup time, although for all values suitable inbuilt defaults are
+preset.
 
-.I vnc.conf
-will be parsed by vncserver. Then vncserver will proceed and read
-.IR $HOME/.vnc/vnc.conf ,
-a file that can be changed on a per-user base. It has the some syntax and
-options as the file described in this document.
+First, \fI/etc/tigervnc/vncserver-config-defaults\fP is read specifying the
+system defaults.
+.
+Then,
+.BR tigervncserver (1)
+will proceed and read\fI $HOME/.vnc/tigervnc.conf\fP, a file that can be
+changed on a per-user base. The options in this file will override the system
+defaults.
+.
+Next, command-line options overwrite both the system defaults and the settings
+in \fI$HOME/.vnc/tigervnc.conf\fP.
+.
+Finally, the configuration file \fI/etc/tigervnc/vncserver-config-mandatory\fP
+is parsed. If this file exists and defines options to be passed to Xtigervnc,
+they will override any of the same options defined in a user's
+\fI$HOME/.vnc/tigervnc.conf\fP as well as options given via the command line.
+This file offers a mechanism to establish some basic form of system-wide policy.
+
+\fBWARNING! There is nothing stopping users from constructing their own start
+script that calls Xtigervnc directly to bypass any options defined in
+/etc/tigervnc/vncserver-config-mandatory.\fP
 
 .SH EXAMPLES
-The site wide configuration file\fI /etc/vnc.conf\fP should come with the Debian package tigervnc-standalone-server.
-This file serves as an example for the user file\fI $HOME/.vnc/vnc.conf\fP.
-The site wide configuration file is pretty self-descriptive, and this document will mainly repeat the information that already can be found there.
+The system configuration file\fI /etc/tigervnc/vncserver-config-defaults\fP should come with the Debian package tigervnc-standalone-server.
+This file serves as an example for the user file\fI $HOME/.vnc/tigervnc.conf\fP.
+The system configuration file is pretty self-descriptive, and this document will mainly repeat the information that already can be found there.
 
 .SH OVERVIEW
 The file is in
@@ -73,7 +90,7 @@ This is the port base for the mini-HTTP server that is built-in to
 The real http port will be derived from this base plus the display number.
 .TP
 .IR $XFConfigPath\ \| =\ " /etc/X11/xorg.conf """;
-Can be set to the global
+Can be set to the system
 .I xorg.conf
 file. This will be
 parsed to gain default values for
@@ -89,7 +106,7 @@ for example.
 Should be a comma separated list of fonts to be added to the font
 path. If not specified, and
 .I $XFConfigPath
-is valid, vncserver will read the $fontPath from there. If both are
+is valid, tigervncserver will read the $fontPath from there. If both are
 not set, the default will apply.
 .\".TP
 .\".IR $colorPath
@@ -129,20 +146,20 @@ where we substitute\fB @HostName@\fP by the fully qualified domain name of the h
 .RE
 .TP
 .IR $vncUserDir\ \| =\ " $ENV{HOME}/.vnc """;
-Contains the filename for the log files directory of Xvnc
+Contains the filename for the log files directory of Xtigervnc
 (the server) and the viewers that are connected to it.
 .TP
 .IR $vncPasswdFile\ \| =\ \| $vncUserDir\ \| .\ " /passwd """;
 Contains the filename of the password file for Xtigervnc. This file is only used for the security types\fB VncAuth\fP,\fB TLSVnc\fP, and\fB X509Vnc\fP.
 .TP
-.IR $vncStartup\ \| =\ " /etc/X11/Xvnc-session """;
+.IR $vncStartup\ \| =\ " /etc/X11/Xtigervnc-session """;
 Points to a script that will be started at the very beginning when neither
-.I $vncUserDir/Xvnc-session
+.I $vncUserDir/Xtigervnc-session
 nor
 .I $vncUserDir/xstartup
 is present.
 If
-.I $vncUserDir/Xvnc-session
+.I $vncUserDir/Xtigervnc-session
 is present, it will be used. Otherwise, we try
 .I $vncUserDir/xstartup\fP.
 If this is also absent, then we use the
@@ -150,9 +167,9 @@ If this is also absent, then we use the
 script. If
 .I $vncStartup
 is specified in
-.I $vncUserDir/vnc.conf\fP,
+.I $vncUserDir/tigervnc.conf\fP,
 then this script is used unconditionally. That is without checking for the presence of
-.I $vncUserDir/Xvnc-session
+.I $vncUserDir/Xtigervnc-session
 or
 .I $vncUserDir/xstartup\fP.
 .TP
@@ -160,13 +177,13 @@ or
 This specifies the session argument for the
 .I $vncStartup
 script. If this is not specified, then
-.I /etc/X11/Xvnc-session
+.I /etc/X11/Xtigervnc-session
 will start the session specified by
 .I /usr/bin/x-session-manager\fP.
 .TP
 .IR $xauthorityFile\ \| =\ " $ENV{HOME}/.Xauthority """;
 Specifies the path to the X authority file that should be used
-by your Xvnc server.
+by your Xtigervnc server.
 .TP
 .IR $desktopName\ \| =\ " ${HOSTFQDN}:nn\ ($ENV{LOGNAME}) """;
 Should be set to the default name of the desktop.
@@ -204,9 +221,9 @@ depth 24 and 32 is RGB888.
 .TP
 .I $getDefaultFrom
 This option lets you set the display from which you can query the default of
-the above three options, if you don't want to start vncserver
+the above three options, if you don't want to start tigervncserver
 from within a running X server. It will be added to the call of xdpyinfo.
-It is useful to get the default from the X server you will run xvncviewer
+It is useful to get the default from the X server you will run xtigervncviewer
 in, because the data has not to be recalculated then.
 
 .IR $getDefaultFrom\ \| =\ " \-display\ localhost:0 """;
@@ -227,17 +244,17 @@ In this case, only the security type \fBVncAuth\fP will be offered.
 If the security types are specified, either via the option \fI\-SecurityTypes\fP given to
 .BR tigervncserver (1)
 or via the \fI$SecurityTypes\fP configuration parameter in
-.IR /etc/vnc.conf
+.IR /etc/tigervnc/vncserver-config-defaults
 or in
-.IR $HOME/.vnc/vnc.conf ,
+.IR $HOME/.vnc/tigervnc.conf ,
 then the default depends on the specified security types.
 The default will be
 .IR $localhost\ \| =\ " no """
 if the specified security types contain at least one of the \fB TLS*\fP or\fB X509*\fP secutity types and also contain none of the \fP *None\fP security types.
 As always, the defaults can be overwritten on the commandline via the \fI\-localhost\fP option or via the \fI$localhost\fP configuration parameter in
-.I /etc/vnc.conf
+.I /etc/tigervnc/vncserver-config-defaults
 or in
-.IR $HOME/.vnc/vnc.conf .
+.IR $HOME/.vnc/tigervnc.conf .
 .TP
 .IR $SecurityTypes\ \| =\ " \fBVncAuth\fP """
 The \fI$SecurityTypes\fP parameter contains a comma separated list of the default security types the Xtigervnc server will offer.
@@ -280,28 +297,30 @@ that usable certificates are present.
 .RE
 .SH FILES
 .TP
-.I /usr/bin/vncserver
+.I /usr/bin/tigervncserver
 A wrapper script around
-.B Xvnc
+.B Xtigervnc
 to start the server with appropriate defaults.
 .TP
-.I /usr/bin/vncpasswd
+.I /usr/bin/tigervncpasswd
 Command to create and change password files to be used by the RFB protocol
 (can be specified in the
 .I $vncPasswdFile
 variable).
 .TP
-.I /usr/bin/Xvnc
-The real server. Will be invoked by vncserver.
+.I /usr/bin/Xtigervnc
+The real server. Will be invoked by tigervncserver.
 .SH "SEE ALSO"
-.BR Xvnc (1),
-.BR vncserver (1),
-.BR x0vncserver (1),
-.BR vncpasswd (1),
-.BR vncviewer (1).
+.BR tigervncconfig (1),
+.BR tigervncpasswd (1),
+.BR tigervncserver (1),
+.BR tigervncsession (8),
+.BR x0tigervncserver (1),
+.BR Xtigervnc (1),
+.BR xtigervncviewer (1)
 .
 .SH AUTHOR
-2020 \- Modified for TigerVNC 1.10.1 by Joachim Falk (Joachim.falk@gmx.de)
+2020 \- Modified for TigerVNC 1.11.0 by Joachim Falk (Joachim.falk@gmx.de)
 2016 \- Modified for TigerVNC 1.7 by Joachim Falk (Joachim.falk@gmx.de)
 2006 \- Modified for vnc 4.1.2 by Joachim Falk (Joachim.falk@gmx.de)
 1998 \- Originally written by Marcus Brinkmann (Marcus.Brinkmann@ruhr-uni-bochum.de)
