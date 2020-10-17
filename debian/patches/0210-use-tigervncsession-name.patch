@@ -1,0 +1,114 @@
+Description: We install all scripts and programs of TigerVNC with a tiger prefix.
+ Hence, we have to adapt some programs to take this into account.
+Author: Joachim Falk <joachim.falk@gmx.de>
+
+Index: pkg-tigervnc/unix/vncserver/vncsession.c
+===================================================================
+--- pkg-tigervnc.orig/unix/vncserver/vncsession.c
++++ pkg-tigervnc/unix/vncserver/vncsession.c
+@@ -408,7 +408,7 @@ run_script(const char *username, const c
+ {
+     struct passwd *pwent;
+     pid_t pid;
+-    const char *child_argv[3];
++    const char *child_argv[4];
+ 
+     pwent = getpwnam(username);
+     if (pwent == NULL) {
+@@ -458,9 +458,10 @@ run_script(const char *username, const c
+     setenv("USER", pwent->pw_name, 1);
+     setenv("USERNAME", pwent->pw_name, 1);
+ 
+-    child_argv[0] = CMAKE_INSTALL_FULL_LIBEXECDIR "/vncserver";
+-    child_argv[1] = display;
+-    child_argv[2] = NULL;
++    child_argv[0] = CMAKE_INSTALL_FULL_BINDIR "/tigervncserver";
++    child_argv[1] = "-fg";
++    child_argv[2] = display;
++    child_argv[3] = NULL;
+ 
+     execvp(child_argv[0], (char*const*)child_argv);
+ 
+@@ -504,7 +505,7 @@ main(int argc, char **argv)
+     if (begin_daemon() == -1)
+         return EX_OSERR;
+ 
+-    openlog("vncsession", LOG_PID, LOG_AUTH);
++    openlog("tigervncsession", LOG_PID, LOG_AUTH);
+ 
+     /* Indicate that this is a graphical user session. We need to do
+        this here before PAM as pam_systemd.so looks at these. */
+@@ -537,13 +538,13 @@ main(int argc, char **argv)
+ 
+     script = run_script(username, display, child_env);
+     if (script == -1) {
+-        syslog(LOG_CRIT, "Failure starting vncserver script");
++        syslog(LOG_CRIT, "Failure starting tigervncserver script");
+         stop_pam(pamh, pamret);
+         return EX_OSERR;
+     }
+ 
+     snprintf(pid_file, sizeof(pid_file),
+-             "/var/run/vncsession-%s.pid", display);
++             "/run/tigervncsession-%s.pid", display);
+     f = fopen(pid_file, "w");
+     if (f == NULL) {
+         syslog(LOG_ERR, "Failure creating pid file \"%s\": %s",
+@@ -568,14 +569,14 @@ main(int argc, char **argv)
+         if (WIFEXITED(status)) {
+             if (WEXITSTATUS(status) != 0) {
+                 syslog(LOG_WARNING,
+-                        "vncsession: vncserver exited with status=%d",
++                        "tigervncsession: tigervncserver exited with status=%d",
+                         WEXITSTATUS(status));
+             }
+             break;
+         }
+         else if (WIFSIGNALED(status)) {
+             syslog(LOG_WARNING,
+-                    "vncsession: vncserver was terminated by signal %d",
++                    "tigervncsession: tigervncserver was terminated by signal %d",
+                     WTERMSIG(status));
+             break;
+         }
+Index: pkg-tigervnc/unix/vncserver/vncserver@.service.in
+===================================================================
+--- pkg-tigervnc.orig/unix/vncserver/vncserver@.service.in
++++ pkg-tigervnc/unix/vncserver/vncserver@.service.in
+@@ -1,11 +1,11 @@
+-# The vncserver service unit file
++# The tigervncserver service unit file
+ #
+ # Quick HowTo:
+ # 1. Add a user mapping to /etc/tigervnc/vncserver.users.
+ # 2. Adjust the global or user configuration. See the
+-#    vncsession(8) manpage for details. (OPTIONAL)
+-# 3. Run `systemctl enable vncserver@:<display>.service`
+-# 4. Run `systemctl start vncserver@:<display>.service`
++#    tigervncsession(8) manpage for details. (OPTIONAL)
++# 3. Run `systemctl enable tigervncserver@:<display>.service`
++# 4. Run `systemctl start tigervncserver@:<display>.service`
+ #
+ # DO NOT RUN THIS SERVICE if your local area network is
+ # untrusted!  For a secure way of using VNC, you should
+@@ -35,8 +35,8 @@ After=syslog.target network.target
+ 
+ [Service]
+ Type=forking
+-ExecStart=@CMAKE_INSTALL_FULL_LIBEXECDIR@/vncsession-start %i
+-PIDFile=/var/run/vncsession-%i.pid
++ExecStart=@CMAKE_INSTALL_FULL_LIBEXECDIR@/tigervncsession-start %i
++PIDFile=/run/tigervncsession-%i.pid
+ SELinuxContext=system_u:system_r:vnc_session_t:s0
+ 
+ [Install]
+Index: pkg-tigervnc/unix/vncserver/vncsession-start.in
+===================================================================
+--- pkg-tigervnc.orig/unix/vncserver/vncsession-start.in
++++ pkg-tigervnc/unix/vncserver/vncsession-start.in
+@@ -40,4 +40,4 @@ if [ -z "${USER}" ]; then
+ 	exit 1
+ fi
+ 
+-exec "@CMAKE_INSTALL_FULL_SBINDIR@/vncsession" "${USER}" "${DISPLAY}"
++exec "@CMAKE_INSTALL_FULL_SBINDIR@/tigervncsession" "${USER}" "${DISPLAY}"

@@ -7,6 +7,5 @@ etc/tigervnc/vncserver-config-mandatory etc/tigervnc
 etc/tigervnc/vncserver.users etc/tigervnc
 etc/X11/Xtigervnc-session etc/X11
 usr/lib/systemd/system/tigervncserver@.service
-usr/libexec/tigervncserver
 usr/libexec/tigervncsession-start
 usr/sbin/tigervncsession

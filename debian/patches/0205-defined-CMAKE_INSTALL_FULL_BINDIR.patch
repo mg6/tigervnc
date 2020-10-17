@@ -1,0 +1,12 @@
+Index: pkg-tigervnc/config.h.in
+===================================================================
+--- pkg-tigervnc.orig/config.h.in
++++ pkg-tigervnc/config.h.in
+@@ -5,6 +5,7 @@
+ #cmakedefine HAVE_ACTIVE_DESKTOP_L
+ #cmakedefine ENABLE_NLS 1
+ 
++#cmakedefine CMAKE_INSTALL_FULL_BINDIR "@CMAKE_INSTALL_FULL_BINDIR@"
+ #cmakedefine CMAKE_INSTALL_FULL_LIBEXECDIR "@CMAKE_INSTALL_FULL_LIBEXECDIR@"
+ #cmakedefine CMAKE_INSTALL_FULL_DATADIR "@CMAKE_INSTALL_FULL_DATADIR@"
+ #cmakedefine CMAKE_INSTALL_FULL_LOCALEDIR "@CMAKE_INSTALL_FULL_LOCALEDIR@"
