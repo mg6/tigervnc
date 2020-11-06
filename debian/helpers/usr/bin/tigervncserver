@@ -721,6 +721,68 @@ sub CreateX509Cert {
   }
 }
 
+#
+# Load a session desktop file
+#
+sub loadXSession {
+  my ($name) = @_;
+  my ($file, $found_group, %session);
+
+  $file = "/usr/share/xsessions/$name.desktop";
+
+  if (!-f $file) {
+    return;
+  }
+
+  my $fh;
+  if (!open($fh, $file)) {
+    warn "Could not open session desktop file $file: $!";
+    return;
+  }
+
+  $found_group = 0;
+  while (my $line = <$fh>) {
+    next if $line =~ /^#/;
+    next if $line =~ /^\s*$/;
+
+    chomp $line;
+
+    if (!$found_group) {
+      next if $line ne "[Desktop Entry]";
+      $found_group = 1;
+      next;
+    } else {
+      last if $line =~ /^\[/;
+    }
+
+    my ($key, $value) = $line =~ /^\s*([]A-Za-z0-9_@\-\[]+)\s*=\s*(.*)$/;
+    if (!$key) {
+      warn "Invalid session desktop file $file";
+      close($fh);
+      return;
+    }
+
+    $value =~ s/\\s/ /g;
+    $value =~ s/\\n/\n/g;
+    $value =~ s/\\t/\t/g;
+    $value =~ s/\\r/\r/g;
+    $value =~ s/\\\\/\\/g;
+
+    $session{$key} = $value;
+    print STDERR "$key => $value\n";
+  }
+
+  close($fh);
+
+  unless (defined $session{'Exec'}) {
+    warn "Invalid session desktop file $file does not contain a command to start the session!";
+    close($fh);
+    return;
+  }
+
+  return $session{'Exec'};
+}
+
 # Now start the X VNC Server
 sub startXvncServer {
   my ($options) = @_;
@@ -998,7 +1060,7 @@ sub usage {
     $prefix."[-X509Cert]            Path to the X509 certificate in PEM format. This is used by\n".
     $prefix."                       the security types X509None, X509Vnc, and X509Plain.\n".
     $prefix."<X11-options ...>      Further options for Xtigervnc(1)\n".
-    $prefix."[-- sessiontype]       Arguments for the VNC startup script Xtigervnc-session\n\n".
+    $prefix."[-- sessiontype]       Specify which X session desktop should be started\n\n".
 
     "  $PROG -kill                  Kill a VNC server\n".
     $prefix."[:<number>|:*]         VNC server to kill, * for all\n".
@@ -1118,11 +1180,12 @@ sub main {
     &readConfigFile($options, $vncUserConfig);
   }
   {
-    unless (defined $options->{'session'}) {
-      $options->{'session'} = [];
-    }
-    unless (ref($options->{'session'}) eq 'ARRAY') {
+    if (defined $options->{'session'} &&
+        ref($options->{'session'}) eq '') {
       $options->{'session'} = [split(qr{\s+}, $options->{'session'})];
+    } elsif (!defined $options->{'session'} ||
+             ref($options->{'session'}) ne 'ARRAY') {
+      $options->{'session'} = [];
     }
     # seperate session args
     {
@@ -1363,8 +1426,22 @@ sub main {
       print STDERR "VNC class files can not be found at $options->{'vncClasses'}.";
       exit 1;
     }
-    unless (ref($options->{'session'}) eq 'ARRAY') {
+    if (defined $options->{'session'} &&
+        ref($options->{'session'}) eq '') {
       $options->{'session'} = [split(qr{\s+}, $options->{'session'})];
+    } elsif (!defined $options->{'session'} ||
+             ref($options->{'session'}) ne 'ARRAY') {
+      $options->{'session'} = [];
+    }
+    if (@{$options->{'session'}} == 1 &&
+        !($options->{'session'}->[0] =~ m{/})) {
+      my $sn = $options->{'session'}->[0];
+      my $sessionCommand = loadXSession($sn);
+      if (defined $sessionCommand) {
+        $options->{'session'} = [$sessionCommand];
+      } else {
+        print STDERR "Could not load X session desktop file $sn\n";
+      }
     }
     if (defined $options->{'localhost'}) {
       $options->{'localhost'} = $options->{'localhost'} =~ m/^(?:yes|true|1)$/i;
