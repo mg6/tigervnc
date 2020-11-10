@@ -9,7 +9,7 @@
 .\" License as specified in the file COPYING that comes with the
 .\" Debian GNU/Linux distribution.
 .\"
-.TH tigervnc.conf 5x "Oct 16th, 2020" "TigerVNC 1.11.0" "Virtual Network Computing"
+.TH tigervnc.conf 5x "Nov 10th, 2020" "TigerVNC 1.11.0" "Virtual Network Computing"
 .SH NAME
 tigervnc.conf \- configuration files for Virtual Network Computing
 .SH SYNOPSIS
@@ -174,7 +174,10 @@ or
 .I $vncUserDir/xstartup\fP.
 .TP
 .IR $session\ \| =\  undef ";
-This specifies the session argument for the
+This option can be used to control which X session type will be started. This should match
+one of the files in \fI/usr/share/xsessions\fP. For example, if there is a file called
+\fIgnome.desktop\fP, then \fI$session = "gnome"\fP would start this X session.
+The command to start the session is passed to the
 .I $vncStartup
 script. If this is not specified, then
 .I /etc/X11/Xtigervnc-session

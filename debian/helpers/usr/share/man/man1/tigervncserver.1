@@ -9,7 +9,7 @@
 .\" License as specified in the file COPYING that comes with the
 .\" Debian GNU/Linux distribution.
 .\"
-.TH tigervncserver 1 "Oct 18th, 2020" "TigerVNC 1.11.0" "Virtual Network Computing"
+.TH tigervncserver 1 "Nov 10th, 2020" "TigerVNC 1.11.0" "Virtual Network Computing"
 .SH NAME
 tigervncserver \- start or stop a TigerVNC server
 .SH SYNOPSIS
@@ -60,7 +60,7 @@ tigervncserver \- start or stop a TigerVNC server
 .IR cert-file ]
 .RI [ "Xtigervnc options..." ]
 .RB [ --
-.RI [ "X session with optional options..." ] \fP]
+.RI "X session or command with optional options..." \fP]
 .
 .br
 .B tigervncserver \-kill
@@ -267,6 +267,12 @@ The default password file is ~/.vnc/passwd.
 Path to a X509 certificate in PEM format to be used for all X509 based security types (X509None, X509Vnc, etc.) as well as its private key also in PEM format.
 If the certificate and its key are not provided via the\fB \-X509Cert\fP and\fB \-X509Key\fP command-line options or their corresponding configuration parameters in \fI/etc/tigervnc/vncserver-config-defaults\fP, \fI~/.vnc/tigervnc.conf\fP, or \fI/etc/tigervnc/vncserver-config-mandatory\fP, then the tigervncserver wrapper script auto generates a self signed certificate.
 The auto generated self signed certificates are stored in the files ~/.vnc/\fIhost\fP-SrvCert.pem and ~/.vnc/\fIhost\fP-SrvKey.pem.
+.
+.TP
+.B \-\- X session
+This special option can be used to control which X session type will be started. This should match
+one of the files in \fI/usr/share/xsessions\fP. For example, if there is a file called
+\fIgnome.desktop\fP, then \fB\-\- gnome\fP would start this X session.
 .
 .TP
 .B \-kill [[\fIuser\fP@]\fIhost\fP][:\fIdisplay#\fP|:*]
