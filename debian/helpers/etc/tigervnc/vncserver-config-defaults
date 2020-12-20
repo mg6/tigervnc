@@ -1,9 +1,7 @@
 # /etc/tigervnc/vncserver-config-defaults written by Joachim Falk. This file is
 # in the Public Domain.
 #
-# This is the configuration file for the tigervnc-standalone-server package.
-# It is Perl syntax and is source from the tigervncserver script. Every value
-# has suitable defaults, so you probably don't need any modifications.
+# This is a configuration file for the tigervnc-standalone-server package.
 #
 # After this file, $ENV{HOME}/.vnc/tigervnc.conf will be sourced, so values can
 # be overwritten on a per-user basis.
@@ -23,6 +21,14 @@
 # * /etc/tigervnc/vncserver-config-mandatory.                                  *
 # ******************************************************************************
 #
+# See the following manpages for more details:
+#  - tigervnc.conf(5x)
+#  - tigervncserver(1)
+#  - tigervncsession(8)
+#  - Xtigervnc(1)
+#
+# This file has Perl syntax and is source from the tigervncserver script. Every
+# value has suitable defaults, so you probably don't need any modifications.
 # If you want to reactivate default values, you have to specify an undef value.
 # For example, $fontPath will set to the default value after
 #
@@ -36,19 +42,6 @@
 # --------------------
 #
 # This section contains entries that should be true for all users.
-
-# $vncClasses   should be the path to the java classes of the VNC server.
-# $baseHttpPort is the port base for the http server. For display :nn
-#               $vncClasses will be served on port $baseHttpPort + nn
-#
-# Default: $vncClasses = "/var/www/vnc"; # if /var/www/vnc is present.
-# Default: $baseHttpPort = undef; # disables the http server
-
-# $XFConfigPath   can be set to the global XF86Config file. This will be
-#                 parsed to gain a default value for $fontPath. If you want
-#                 to disable this feature, point it to an invalid file,
-#                 "/invalid" for example.
-# $XFConfigPath = "/etc/X11/xorg.conf";
 
 # $fontPath should be a comma separated list of fonts to be added to the font
 #           path. If not specified, and $XFConfigPath is valid, vncserver

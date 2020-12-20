@@ -64,6 +64,25 @@ sub readConfigFile {
 #  }
 }
 
+package OptionTie;
+
+sub TIESCALAR {
+  my $class  = shift;
+  my $option = shift;
+
+  return bless $option, $class;
+}
+
+sub STORE {
+  my $self = shift;
+  &{$self}($_[0]);
+}
+
+sub FETCH {
+  my $self = shift;
+  return &{$self}();
+}
+
 package main;
 
 use strict;
@@ -169,15 +188,268 @@ chomp($USER = `/usr/bin/id -u -n`);
 
 our $SYSTEMCONFIGDIR = "/etc/tigervnc";
 
+sub OPT_NOCASE()          { return 1; }
+sub OPT_CFGFILE()         { return 2; }
+sub OPT_TIGERVNCSERVER()  { return 4; }
+sub OPT_XTIGERVNC()       { return 8; }
+
+sub getOptionParseTable {
+  my ($options) = @_;
+
+  # Flag field in $optionParseTable
+  # 1 => Case insensitive
+  # 2 => Config file parameter
+  # 4 => Command line option for tigervncserver
+  # 8 => Command line option for Xtigervnc
+
+  my @optionParseTable = (
+#     [ flag, 'name=type'      => store        ],
+      [ 4, 'name=s'            => \$options->{'desktopName'} ],
+      [ 4, 'kill'              => \$options->{'kill'} ],
+      [ 4, 'help|h|?'          => \$options->{'help'} ],
+      [ 4, 'list'              => \$options->{'list'} ],
+      [ 4, 'fg'                => \$options->{'fg'} ],
+      [ 4, 'autokill'          => \$options->{'autokill'} ],
+      [ 4, 'noxstartup'        => sub {
+          if (@_ == 2) {
+            $options->{'noxstartup'} = 1;
+            $options->{'vncStartup'} = undef;
+          } else {
+            return $options->{'noxstartup'};
+          }
+        } ],
+      [ 4, 'xstartup:s'        => sub {
+          if (@_ == 2) {
+            $options->{'noxstartup'} = 0;
+            if ($_[1] eq '') {
+              $options->{'vncStartup'} = undef;
+            } else {
+              $options->{'vncStartup'} = $_[1];
+            }
+          } else {
+            return $options->{'vncStartup'};
+          }
+        } ],
+      [ 4, 'xdisplaydefaults'  => sub {
+          &getXDisplayDefaults($options);
+        } ],
+      [ 6, 'wmDecoration=s'    => \$options->{'wmDecoration'} ],
+      [ 4, 'useold'            => \$options->{'useold'} ],
+      [ 4, 'cleanstale'        => \$options->{'cleanstale'} ],
+      [ 4, 'clean'             => \$options->{'clean'} ],
+      [ 4, 'verbose'           => \$options->{'verbose'} ],
+      [ 4, 'dry-run'           => \$options->{'dry-run'} ],
+      [ 4, 'passwd=s'          => \$options->{'vncPasswdFile'} ],
+      [ 4, 'I-KNOW-THIS-IS-INSECURE' => \$options->{'I-KNOW-THIS-IS-INSECURE'} ],
+      # Config file stuff
+      [ 2, 'fontPath=s'        => \$options->{'fontPath'} ],
+      [ 2, 'sslAutoGenCertCommand=s' => \$options->{'sslAutoGenCertCommand'} ],
+      [ 2, 'vncUserDir=s'      => \$options->{'vncUserDir'} ],
+      [ 2, 'vncPasswdFile=s'   => \$options->{'vncPasswdFile'} ],
+      [ 2, 'vncStartup=s'      => \$options->{'vncStartup'} ],
+      [ 2, 'xauthorityFile=s'  => \$options->{'xauthorityFile'} ],
+      [ 2, 'desktopName=s'     => \$options->{'desktopName'} ],
+      [ 2, 'getDefaultFrom=s'  => \$options->{'getDefaultFrom'} ],
+      # Arguments from Xtigervnc (case sensitive)
+      [14, 'auth=s'            => \$options->{'xauthorityFile'} ],
+      [14, 'fp=s'              => \$options->{'fontPath'} ],
+      [14, 'geometry=s', sub {
+          if (@_ == 2) {
+            $options->{'geometry'} = $_[1];
+            $options->{'wmDecoration'} = "0x0";
+          } else {
+            return $options->{'geometry'};
+          }
+        } ],
+      [14, 'depth=i', \$options->{'depth'} ],
+      [14, 'pixelformat=s', sub {
+          if (@_ == 2) {
+            $options->{'pixelformat'} = $_[1];
+            undef $options->{'depth'};
+          } else {
+            return $options->{'pixelformat'};
+          }
+        } ],
+      # -inetd is not handled
+      [14, 'interface=s', sub {
+          if (@_ == 2) {
+            $options->{'interface'} = $_[1];
+            undef $options->{'localhost'};
+          } else {
+            return $options->{'interface'};
+          }
+        } ],
+      # Parameters from Xtigervnc (case insensitive)
+      [15, 'desktop=s', \$options->{'desktopName'} ],
+      [15, 'rfbport=i', \$options->{'rfbport'} ],
+      [15, 'UseIPv4:b', \$options->{'UseIPv4'} ],
+      [15, 'UseIPv6:b', \$options->{'UseIPv6'} ],
+      [15, 'rfbunixpath=s', \$options->{rfbunixpath} ],
+      [15, 'rfbunixmode=s', \$options->{rfbunixmode} ],
+      [15, 'rfbwait|ClientWaitTimeMillis=i', \$options->{rfbwait} ],
+      [15, 'rfbauth|PasswordFile=s', \$options->{'vncPasswdFile'} ],
+      [15, 'AcceptCutText:b', \$options->{'AcceptCutText'} ],
+      [15, 'MaxCutText=i', \$options->{MaxCutText} ],
+      [15, 'SendCutText:b', \$options->{'SendCutText'} ],
+      [15, 'SendPrimary:b', \$options->{'SendPrimary'} ],
+      [15, 'AcceptPointerEvents:b', \$options->{'AcceptPointerEvents'} ],
+      [15, 'AcceptKeyEvents:b', \$options->{'AcceptKeyEvents'} ],
+      [15, 'AcceptSetDesktopSize:b', \$options->{'AcceptSetDesktopSize'} ],
+      [15, 'DisconnectClients:b', \$options->{'DisconnectClients'} ],
+      [15, 'NeverShared:b', sub {
+          if (@_ == 2) {
+            if ($_[1] eq '' || $_[1] eq '1') {
+              $options->{'shared'} = 'never';
+            } elsif ($options->{'shared'} eq 'never') {
+              $options->{'shared'} = undef;
+            }
+          } elsif (defined $options->{'shared'}) {
+            return $options->{'shared'} eq 'never';
+          } else {
+            return undef;
+          }
+        } ],
+      [15, 'AlwaysShared:b', sub {
+          if (@_ == 2) {
+            if ($_[1] eq '' || $_[1] eq '1') {
+              $options->{'shared'} = 'always';
+            } elsif ($options->{'shared'} eq 'always') {
+              $options->{'shared'} = undef;
+            }
+          } elsif (defined $options->{'shared'}) {
+            return $options->{'shared'} eq 'always';
+          } else {
+            return undef;
+          }
+        } ],
+      [15, 'Protocol3.3:b', \$options->{'Protocol3.3'} ],
+      [15, 'FrameRate=i', \$options->{FrameRate} ],
+      [15, 'CompareFB=s', \$options->{CompareFB} ],
+      [15, 'ZlibLevel=i', \$options->{ZlibLevel} ],
+      [15, 'ImprovedHextile:b', \$options->{'ImprovedHextile'} ],
+      [15, 'SecurityTypes=s', \$options->{SecurityTypes} ],
+      [15, 'Password=s', \$options->{Password} ],
+      [15, 'PlainUsers=s', \$options->{PlainUsers} ],
+      [15, 'pam_service|PAMService=s', \$options->{PAMService} ],
+      [15, 'X509Cert=s', \$options->{X509Cert} ],
+      [15, 'X509Key=s',  \$options->{X509Key}  ],
+      [15, 'GnuTLSPriority=s', \$options->{GnuTLSPriority} ],
+      [15, 'UseBlacklist:b', \$options->{'UseBlacklist'} ],
+      [15, 'BlacklistThreshold=i', \$options->{BlacklistThreshold} ],
+      [15, 'BlacklistTimeout=i', \$options->{BlacklistTimeout} ],
+      [15, 'IdleTimeout=i', \$options->{IdleTimeout} ],
+      [15, 'MaxDisconnectionTime=i', \$options->{MaxDisconnectionTime} ],
+      [15, 'MaxConnectionTime=i', \$options->{MaxConnectionTime} ],
+      [15, 'MaxIdleTime=i', \$options->{MaxIdleTime} ],
+      [15, 'QueryConnect:b', \$options->{'QueryConnect'} ],
+      [15, 'QueryConnectTimeout=i', \$options->{QueryConnectTimeout} ],
+      [15, 'localhost:b', \$options->{'localhost'} ],
+      [15, 'Log=s', \$options->{Log} ],
+      [15, 'RemapKeys=s', \$options->{RemapKeys} ],
+      [15, 'AvoidShiftNumLock:b', \$options->{AvoidShiftNumLock} ],
+      [15, 'RawKeyboard:b', \$options->{'RawKeyboard'} ],
+      [15, 'AllowOverride=s', \$options->{AllowOverride} ],
+    );
+
+  my $optionParseTable = [];
+  foreach my $optionParseEntry (@optionParseTable) {
+    my ($flags, $optname, $store) = @{$optionParseEntry};
+    if (@{$optionParseEntry} != 3 ||
+        (ref($store) ne 'SCALAR' && ref($store) ne 'CODE')) {
+#     print $#{$optionParseEntry}, "\n";
+#     print ref($optionParseEntry->[2]), "\n";
+      die "Oops, internal error: Wrong optioneParseEntry!";
+    }
+    my $valueVerifyer = undef;
+    if ($optname =~ m/:b$/) {
+      $valueVerifyer = sub {
+        if ($_[1] eq '' || $_[1] eq '1' || $_[1] eq 'yes' || $_[1] eq 'true') {
+          return 1;
+        } elsif ($_[1] eq '0' || $_[1] eq 'no' || $_[1] eq 'false') {
+          return 0;
+        } else {
+          die "Option $_[0] can only be set to true or false!";
+        }
+      }
+    } elsif ($optname =~ m/=i$/) {
+      $valueVerifyer = sub { $_[1] };
+    } elsif ($optname =~ m/[=:]s$/) {
+      $valueVerifyer = sub { $_[1] };
+    } elsif ($optname =~ m/[=:!+]/) {
+      die "Oops, internal error: Can't parse $optname format!";
+    } else {
+      $valueVerifyer = sub {
+        die "Option $_[0] can only be set to 1!" unless $_[1] eq 1;
+        $_[1]
+      };
+    }
+    if (ref($store) eq 'SCALAR') {
+      push @{$optionParseTable}, [
+          $flags,
+          $optname,
+          sub {
+            if (@_ == 2) {
+              print STDERR $_[0], " <= ", $_[1]//"undef","\n";
+              &{$valueVerifyer}(@_);
+              ${$store} = &{$valueVerifyer}(@_);
+              return undef;
+            } else {
+              my $value = ${$store};
+              print STDERR $_[0], " => ", $value//"undef","\n";
+              return $value;
+            }
+          }
+        ];
+    } else { # ref($store) eq 'CODE'
+      push @{$optionParseTable}, [
+          $flags,
+          $optname,
+          sub {
+            if (@_ == 2) {
+              print STDERR $_[0], " <= ", $_[1]//"undef","\n";
+              &{$valueVerifyer}(@_);
+              &{$store}($_[0], &{$valueVerifyer}(@_));
+              return undef;
+            } else {
+              my $value = &{$store}(@_);
+              print STDERR $_[0], " => ", $value//"undef","\n";
+              return $value;
+            }
+          }
+        ];
+      push @{$optionParseTable}, $optionParseEntry;
+    }
+  }
+
+  return $optionParseTable;
+}
+
+&getOptionParseTable();
+
+
 sub readConfigFile {
   my $options = shift;
 
-  # Add aliases of ::config to %$options
-  foreach my $key (keys %$options) {
+  foreach my $optionParseEntry (@{&getOptionParseTable($options)}) {
     no strict 'refs';
-    *{"config::$key"} = \$options->{$key};
+    my ($flags, $optname, $store) = @{$optionParseEntry};
+    next unless $flags & &OPT_CFGFILE;
+
+    $optname =~ m/^([^:=]*)/;
+    $optname = $1;
+
+    foreach my $name (split(/\|/, $optname)) {
+#     print STDERR $name, "\n";
+      tie ${"config::$name"}, 'OptionTie', sub { &{$store}($name, @_) };
+    }
   }
+# # Add aliases of ::config to %$options
+# foreach my $key (keys %$options) {
+#   no strict 'refs';
+#   *{"config::$key"} = \$options->{$key};
+# }
   foreach my $ConfigFile (@_) {
+    print STDERR "readConfigFile $ConfigFile\n";
     next unless -f $ConfigFile;
     config::readConfigFile( $ConfigFile );
   }
@@ -188,55 +460,6 @@ sub readConfigFile {
 #    }
 #    print $key, " => ", $options->{$key}, "\n";
 #  }
-}
-
-sub readXFConfig {
-  my $options = shift;
-  my ($XFConfigPath) = @_;
-
-  my $cf;
-  foreach my $path (split(/:/, $XFConfigPath)) {
-    last if defined ($cf = IO::File->new( "<$path" ));
-  }
-  return unless defined $cf;
-  my $lineno = 0;
-  my ( $fontPath, $colorPath );
-  while (<$cf>) {
-    chomp;
-    $lineno++;
-    s/\#.*//og;
-    next if /^\s*$/og;
-    if (/^\s*FontPath\s*"(\S.*)"\s*$/o) {
-      if (defined $fontPath) {
-        $fontPath .= ",$1";
-      } else {
-        $fontPath  = $1;
-      }
-    }
-#   if (/^\s*RgbPath\s*"(\S.*)"\s*$/o) {
-#     $colorPath = $1;
-#   }
-  }
-  if (defined $fontPath) {
-    my @fontPathElements = split(/\s*,\s*/, $fontPath);
-
-    $fontPath = '';
-    foreach my $tempFontPath (@fontPathElements) {
-      # is font directory or fontserver (xfs) ?
-      if ($tempFontPath !~ m{^[^/]*/[^/]*:\d+$}) {
-        # font directory
-        $tempFontPath =~ s/:unscaled$//; # remove :unscaled
-        # is really a font directory ?
-        next unless -r "$tempFontPath/fonts.dir"; # skip if not
-      }
-      $fontPath .= "$tempFontPath,";
-    }
-    chop $fontPath; # remove last ','
-    $options->{'fontPath'}  = $fontPath;
-  }
-# if (defined $colorPath) {
-#   $options->{'colorPath'} = $colorPath;
-# }
 }
 
 ###############################################################################
@@ -812,38 +1035,36 @@ sub startXvncServer {
     # I am the child
     my @cmd = (getCommand("Xtigervnc"));
     push @cmd, ":".$options->{'displayNumber'};
-    if (defined $options->{'desktopName'}) {
-      push @cmd, '-desktop', $options->{'desktopName'};
+    foreach my $optionParseEntry (@{&getOptionParseTable($options)}) {
+      my ($flags, $optname, $store) = @{$optionParseEntry};
+      next unless $flags & &OPT_XTIGERVNC;
+      $optname =~ m/^([^:=|]*)/;
+      my $name = $1;
+      my $value = &{$store}($name);
+      if ($optname =~ m/:/) {
+        push @cmd, "-$name=$value" if defined $value;
+      } elsif ($optname =~ m/=/) {
+        push @cmd, "-$name", $value if defined $value;
+      } else {
+        die "Oops, can't parse $optname format!";
+      }
     }
-    if (defined $options->{'vncClasses'} &&
-         (defined($options->{'httpPort'}) ||
-          defined($options->{'baseHttpPort'}))) {
-      print("Found $options->{'vncClasses'} for http connections.\n");
-      push @cmd, '-httpd', $options->{'vncClasses'};
-      my $v = $options->{'httpPort'} ||
-              $options->{'baseHttpPort'} + $options->{'displayNumber'};
-      push @cmd, '-httpPort', $v;
-      print("Listening to $v for http connections.\n");
-    }
-    push @cmd, '-auth', $options->{'xauthorityFile'};
-    push @cmd, '-geometry', $options->{'geometry'} if $options->{'geometry'};
-    push @cmd, '-depth', $options->{'depth'} if $options->{'depth'};
-    push @cmd, '-pixelformat', $options->{'pixelformat'} if $options->{'pixelformat'};
-    push @cmd, '-rfbwait', $options->{'rfbwait'};
-    push @cmd, '-rfbauth', $options->{'vncPasswdFile'} if $options->{'vncAuthEnabled'};
-    push @cmd, '-rfbport', $rfbport;
-    push @cmd, '-pn';
-    push @cmd, '-localhost' if $options->{'localhost'} =~ m/^(?:yes|true|1)$/i;
-    push @cmd, '-fp', $options->{'fontPath'} if $options->{'fontPath'};
-    push @cmd, "-SecurityTypes", $options->{'SecurityTypes'} if defined $options->{'SecurityTypes'};
-    if ($options->{'plainAuthEnabled'}) {
-      push @cmd, "-PAMService", $options->{'PAMService'} if defined $options->{'PAMService'};
-      push @cmd, "-PlainUsers", $options->{'PlainUsers'} if defined $options->{'PlainUsers'};
-    }
-    if ($options->{'x509CertRequired'}) {
-      push @cmd, "-X509Cert", $options->{'X509Cert'} if defined $options->{'X509Cert'};
-      push @cmd, "-X509Key", $options->{'X509Key'} if defined $options->{'X509Key'};
-    }
+#   push @cmd, '-desktop', $options->{'desktopName'} if defined $options->{'desktopName'};
+#   push @cmd, '-auth', $options->{'xauthorityFile'};
+#   push @cmd, '-geometry', $options->{'geometry'} if $options->{'geometry'};
+#   push @cmd, '-depth', $options->{'depth'} if $options->{'depth'};
+#   push @cmd, '-pixelformat', $options->{'pixelformat'} if $options->{'pixelformat'};
+#   push @cmd, '-rfbwait', $options->{'rfbwait'};
+#   push @cmd, '-rfbauth', $options->{'vncPasswdFile'} if $options->{'vncPasswdFile'};
+#   push @cmd, '-rfbport', $rfbport;
+#   push @cmd, '-pn';
+#   push @cmd, '-localhost' if $options->{'localhost'} =~ m/^(?:yes|true|1)$/i;
+#   push @cmd, '-fp', $options->{'fontPath'} if $options->{'fontPath'};
+#   push @cmd, "-SecurityTypes", $options->{'SecurityTypes'} if defined $options->{'SecurityTypes'};
+#   push @cmd, "-PAMService", $options->{'PAMService'} if defined $options->{'PAMService'};
+#   push @cmd, "-PlainUsers", $options->{'PlainUsers'} if defined $options->{'PlainUsers'};
+#   push @cmd, "-X509Cert", $options->{'X509Cert'} if defined $options->{'X509Cert'};
+#   push @cmd, "-X509Key", $options->{'X509Key'} if defined $options->{'X509Key'};
     push @cmd, @ARGV;
 
     print join(" ",@cmd), "\n" if $options->{'verbose'};
@@ -1034,8 +1255,6 @@ sub usage {
     $prefix."[-wmDecoration <dim>]  Shrink geometry from xdisplaydefaults by dim\n".
     $prefix."[-localhost yes|no]    Only accept VNC connections from localhost\n".
     $prefix."[-rfbport port]        TCP port to listen for RFB protocol\n".
-    $prefix."[-httpPort     port]   Port of internal http server\n".
-    $prefix."[-baseHttpPort port]   Calculate http port from base port + display nr\n".
     $prefix."[-fg]                  No daemonization and\n".
     $prefix."                       kill the VNC server after its X session has terminated\n".
     $prefix."[-autokill]            Kill the VNC server after its X session has terminated\n".
@@ -1083,10 +1302,6 @@ sub main {
   my $options = {
 # Values that are documented in /etc/vnc.conf
 ## Values declared as system values in /etc/vnc.conf
-      vncClasses                =>
-        undef, # /var/www/vnc if the directory exists (checked later)
-      baseHttpPort              => undef,
-      XFConfigPath              => "/etc/X11/xorg.conf",
       fontPath                  => undef,
       PAMService                =>
         undef, # Use vnc if /etc/pam.d/vnc exists. Otherwise,
@@ -1128,7 +1343,6 @@ sub main {
 # Undocumented values
       cleanstale                => 0,
       clean                     => 0,
-      httpPort                  => undef,
       displayNumber             => undef,
       displayHost               => undef,
     };
@@ -1137,11 +1351,6 @@ sub main {
   # Then source in configuration files, first the site wide one and then the
   # user specific one.
   #
-  {
-    my $tmpOpt = { XFConfigPath => $options->{'XFConfigPath'} };
-    &readConfigFile($tmpOpt, "$SYSTEMCONFIGDIR/vncserver-config-defaults");
-    &readXFConfig($options, $tmpOpt->{'XFConfigPath'});
-  }
   &readConfigFile($options, "$SYSTEMCONFIGDIR/vncserver-config-defaults");
 
   if (!(-d $options->{'vncUserDir'})) {
@@ -1247,12 +1456,6 @@ sub main {
       'xdisplaydefaults'  => sub {
         &getXDisplayDefaults($options); },
       'wmDecoration=s'    => \$options->{'wmDecoration'},
-      'httpPort=i'        => sub {
-        $options->{'httpPort'} = $_[1];
-        undef $options->{'baseHttpPort'}; },
-      'baseHttpPort=i'    => sub {
-        $options->{'baseHttpPort'} = $_[1];
-        undef $options->{'httpPort'}; },
       'localhost:s'       =>  sub {
           if ($_[1] eq '') {
             $options->{'localhost'} = 1;
@@ -1325,7 +1528,6 @@ sub main {
         push @cmd, "-noxstartup" if $opts{'noxstartup'};
         push @cmd, "-xstartup", $opts{'vncStartup'} if defined $opts{'vncStartup'};
         push @cmd, "-autokill" if $opts{'autokill'};
-        push @cmd, "-httpPort", $options->{'httpPort'} if ($options->{'httpPort'});
         push @cmd, "-rfbport", $options->{'rfbport'} if ($options->{'rfbport'});
         push @cmd, "-baseHttpPort", $options->{'baseHttpPort'} if ($options->{'baseHttpPort'});
         push @cmd, "-localhost", $options->{'localhost'} if defined $options->{'localhost'};
@@ -1420,12 +1622,6 @@ sub main {
       $options->{'vncPasswdFile'} =
         File::Spec->catfile($options->{'vncUserDir'}, "passwd");
     }
-    if (! defined $options->{'vncClasses'}) {
-      $options->{'vncClasses'} = "/var/www/vnc" if -d "/var/www/vnc";
-    } elsif (! -d $options->{'vncClasses'}) {
-      print STDERR "VNC class files can not be found at $options->{'vncClasses'}.";
-      exit 1;
-    }
     if (defined $options->{'session'} &&
         ref($options->{'session'}) eq '') {
       $options->{'session'} = [split(qr{\s+}, $options->{'session'})];
@@ -1497,6 +1693,18 @@ sub main {
         !$options->{'I-KNOW-THIS-IS-INSECURE'}) {
       print STDERR "Please be aware that you are exposing your VNC server to all users on the\n";
       print STDERR "local machine. These users can access your server without authentication!\n";
+    }
+
+    unless ($options->{'vncAuthEnabled'}) {
+      delete $options->{'vncPasswdFile'};
+    }
+    unless ($options->{'plainAuthEnabled'}) {
+      delete $options->{'PAMService'};
+      delete $options->{'PlainUsers'};
+    }
+    unless ($options->{'x509CertRequired'}) {
+      delete $options->{'X509Cert'};
+      delete $options->{'X509Key'};
     }
   }
 
