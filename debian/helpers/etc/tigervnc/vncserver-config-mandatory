@@ -33,7 +33,7 @@
 
 # $geometry sets framebuffer width & height.
 #
-# Example: geometry="2000x1200";
+# Example: $geometry="2000x1200";
 
 # $localhost should the TigerVNC server only listen on localhost for
 #            incoming VNC connections.
