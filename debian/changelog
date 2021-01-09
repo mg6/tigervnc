@@ -1,7 +1,7 @@
 tigervnc (1.11.0+dfsg-1~RC6) UNRELEASED; urgency=medium
 
   [ Joachim Falk ]
-  * Fresh upstream TigerVNC 1.11.0
+  * Fresh upstream TigerVNC 1.11.0 (Closes: #976002).
 
   [ Debian Janitor ]
   * Use correct machine-readable copyright file URI.
