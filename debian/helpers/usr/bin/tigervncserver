@@ -35,13 +35,64 @@ package config;
 
 #########################################################################
 #
-# I thank Manoj for the code below. All errors are mine, though.
-#
 # readConfigFile reads in a config file and sets variables according to it.
 #
 
-sub readConfigFile {
-  return do $_[0];
+sub readConfigFile($$$) {
+  my ($options, $desc, $configFile) = @_;
+
+  # Clean config package before loading new config
+  foreach my $key (keys %{config::}) {
+    delete ${config::}{$key};
+  }
+
+  my %tiedNoCase;
+
+  foreach my $optionParseEntry (@{&main::getOptionParseTable($options, $desc)}) {
+    my ($flags, $optname, $store) = @{$optionParseEntry};
+    next unless $flags & &main::OPT_CFGFILE;
+
+    $optname =~ m/^([^:=]*)/;
+    $optname = $1;
+
+#   print STDERR "==> $optname <==\n";
+    foreach my $name (split(/\|/, $optname)) {
+      $name =~ s{[^a-zA-Z0-9_]}{_}g;
+#     print STDERR $name, "\n";
+      no strict 'refs';
+      tie ${"config::$name"}, 'OptionTie', sub { &{$store}($name, @_) };
+      $tiedNoCase{lc($name)} = $name;
+    }
+  }
+
+# print STDERR "readConfigFile $desc $configFile\n";
+
+  $@ = undef;
+  do $configFile;
+  if ($@) {
+    print STDERR "$main::PROG: Error parsing config file $ConfigFile: $@";
+    exit -1;
+  }
+
+  foreach my $key (keys %{config::}) {
+    if (my $name = $tiedNoCase{lc($key)}) {
+      next if $name eq $key;
+      print STDERR "$main::PROG: Warning: $key option must be $name in config file $configFile!\n";
+      next;
+    }
+    my $value = ${${config::}{$key}};
+    $options->{'vncServerExtraArgs'} = [grep {
+	$_->{'name'} ne $key
+      } @{$options->{'vncServerExtraArgs'}}];
+    if (defined $value) {
+      push @{$options->{'vncServerExtraArgs'}}, {
+	  name => $key,
+	  src  => $desc,
+	  args => [ "-$key", $value ]
+	};
+    }
+  }
+  return 1;
 }
 
 package OptionTie;
@@ -189,7 +240,7 @@ sub getOptionParseTable($$) {
 
     if ($desc eq 'mandatory' && defined $options->{'src'}->{$name} &&
         $value ne $options->{$name}) {
-      my $ConfigFile = File::Spec->catfile($SYSTEMCONFIGDIR,
+      my $configFile = File::Spec->catfile($SYSTEMCONFIGDIR,
         "vncserver-config-mandatory");
       my $v;
       if (!defined $value) {
@@ -202,11 +253,11 @@ sub getOptionParseTable($$) {
         die 'Oops, '.ref($value).' values not supported!';
       }
       if ($options->{'src'}->{$name} eq 'defaults') {
-        print("Warning: $ConfigFile is overriding $name from defaults config to be $v\n");
+        print STDERR "$PROG: Warning: $configFile is overriding $name from defaults config to be $v!\n";
       } elsif ($options->{'src'}->{$name} eq 'user') {
-        print("Warning: $ConfigFile is overriding $name form user config to be $v\n");
+        print STDERR "$PROG: Warning: $configFile is overriding $name form user config to be $v!\n";
       } elsif ($options->{'src'}->{$name} eq 'cmdline') {
-        print("Warning: $ConfigFile is overriding $name from commandline to be $v\n");
+        print STDERR "$PROG: Warning: $configFile is overriding $name from commandline to be $v!\n";
       }
     }
     $options->{$name} = $value;
@@ -451,65 +502,72 @@ sub getOptionParseTable($$) {
   return $optionParseTable;
 }
 
-sub readConfigFile {
-  my ($options, $desc, $ConfigFile) = @_;
-  
+sub readConfigFile($$) {
+  my ($options, $desc) = @_;
+  my ($configFile, $textConfig);
+
   if ($desc eq 'mandatory') {
-    if (defined $ConfigFile) {
-      die "Oops, custom mandatory config file path not allowed!";
-    }
-    $ConfigFile = File::Spec->catfile($SYSTEMCONFIGDIR,
+    $configFile = File::Spec->catfile($SYSTEMCONFIGDIR,
       "vncserver-config-mandatory");
   } elsif ($desc eq 'defaults') {
-    if (defined $ConfigFile) {
-      die "Oops, custom defaults config file path not allowed!";
-    }
-    $ConfigFile = File::Spec->catfile($SYSTEMCONFIGDIR,
+    $configFile = File::Spec->catfile($SYSTEMCONFIGDIR,
       "vncserver-config-defaults");
-  } elsif ($desc ne 'user') {
+  } elsif ($desc eq 'user') {
+    if (-f File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf")) {
+      # User provided TigerVNC configuration found
+      $configFile = File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf");
+    } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf")) {
+      # This is deprecated rename it to tigervnc.conf
+      if (rename
+	  File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf")
+	, File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf")) {
+	symlink "tigervnc.conf"
+	  , File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf");
+	# User provided TigerVNC configuration found
+	$configFile = File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf");
+      } else {
+	# User provided TigerVNC configuration found
+	$configFile = File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf");
+      }
+    } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "config")) {
+      # User provided TigerVNC configuration found
+      $configFile = File::Spec->catfile($options->{'vncUserDir'}, "config");
+      $textConfig = 1;
+    }
+  } else {
     die "Oops, $desc config file not known!";
   }
-  
-  return unless -f $ConfigFile;
-  
-  foreach my $optionParseEntry (@{&getOptionParseTable($options, $desc)}) {
-    no strict 'refs';
-    my ($flags, $optname, $store) = @{$optionParseEntry};
-    next unless $flags & &OPT_CFGFILE;
-    
-    $optname =~ m/^([^:=]*)/;
-    $optname = $1;
-    
-#   print STDERR "==> $optname <==\n";
-    foreach my $name (split(/\|/, $optname)) {
-      $name =~ s{[^a-zA-Z0-9_]}{_}g;
-#     print STDERR $name, "\n";
-      tie ${"config::$name"}, 'OptionTie', sub { &{$store}($name, @_) };
+
+  return unless defined $configFile and -f $configFile;
+
+  if ($textConfig) {
+    my $configFileFh = IO::File->new($configFile, "r");
+
+    my %lowCase;
+
+    foreach my $optionParseEntry (@{&getOptionParseTable($options, $desc)}) {
+      my ($flags, $optname, $store) = @{$optionParseEntry};
+      next unless $flags & &OPT_CFGFILE;
+
+      $optname =~ m/^([^:=]*)/;
+      $optname = $1;
+
+      foreach my $name (split(/\|/, $optname)) {
+	$lowCase{lc($name)} = sub { &{$store}($name, @_) };
+      }
     }
+    while (my $line = <$configFileFh>) {
+      next if $line =~ /^#/;
+      if (my ($k, $v) = $line =~ /^\s*(\w+)\s*=\s*(.+)$/) {
+	&{$lowCase{lc($k)}}($v);
+      } elsif ($line =~ m/^\s*(\S+)/) {
+	&{$lowCase{lc($k)}}(1);
+      }
+    }
+    $configFileFh->close();
+  } else {
+    &config::readConfigFile($options, $desc, $configFile);
   }
-  
-# print STDERR "readConfigFile $desc $ConfigFile\n";
-  
-  $@ = undef;
-  config::readConfigFile($ConfigFile);
-  if ($@) {
-    print STDERR "$PROG: Error parsing config file $ConfigFile: $@";
-    exit -1;
-  }
-#  my $lineno = 0;
-#  while (<$cf>) {
-#    chomp;
-#    $lineno++;
-#    s/\#.*//og;
-#    next if /^\s*$/og;
-#    $_ .= ";" unless /;\s*$/;
-#    if (/^\s*([^=]+)\s*=\s*(\S.*)$/o) {
-#      my $ret = eval "$1=$2";
-#      if ($@) {
-#        print STDERR "$PROG: Error parsing config file $ConfigFile at line $lineno!\n";
-#      }
-#    }
-#  }
 }
 
 ###############################################################################
@@ -1042,7 +1100,7 @@ sub loadXSession {
     $value =~ s/\\\\/\\/g;
 
     $session{$key} = $value;
-    print STDERR "$key => $value\n";
+#   print STDERR "$key => $value\n";
   }
 
   close($fh);
@@ -1103,7 +1161,7 @@ sub startXvncServer {
       }
     }
 #   push @cmd, '-pn';
-    push @cmd, @{$options->{'vncServerExtraArgs'}};
+    push @cmd, map { @{$_->{'args'}} } @{$options->{'vncServerExtraArgs'}};
 
     print join(" ",@cmd), "\n" if $options->{'verbose'};
     open(OLDERR, '>&', \*STDERR); # save old STDERR
@@ -1323,7 +1381,7 @@ sub parseCmdLine {
         }
       }
     }
-    my $pendingExtraArg = 0;
+    my $pendingExtraArg = undef;
     while (@ARGV) {
       my $arg = shift @ARGV;
       my $opt = undef;
@@ -1346,7 +1404,7 @@ sub parseCmdLine {
         if (defined $nr) {
           $options->{'displayNumber'} = $nr;
         }
-        $pendingExtraArg = 0;
+        undef $pendingExtraArg;
         next;
       } elsif ($arg =~ m/^(-([a-zA-Z]))=(.*)$/) {
         $arg = $1;
@@ -1363,9 +1421,9 @@ sub parseCmdLine {
       } elsif ($arg =~ m/^([a-zA-Z][^=]+)=(.*)$/) {
         $par = $1;
         $val = $2;
-      } elsif ($pendingExtraArg) {
-        push @{$options->{'vncServerExtraArgs'}}, $arg;
-        $pendingExtraArg = 0;
+      } elsif (defined $pendingExtraArg) {
+        push @{$pendingExtraArg->{'args'}}, $arg;
+	undef $pendingExtraArg;
         next;
       } else {
         $rc = 0;
@@ -1414,10 +1472,18 @@ sub parseCmdLine {
           $rc = 0;
           last;
         }
-        $pendingExtraArg = 0;
+        undef $pendingExtraArg;
       } else {
-        push @{$options->{'vncServerExtraArgs'}}, $arg;
-        $pendingExtraArg = !defined $val;
+	$options->{'vncServerExtraArgs'} = [grep {
+	    $_->{'name'} ne $opt
+	  } @{$options->{'vncServerExtraArgs'}}];
+	$pendingExtraArg = {
+	    name => $opt,
+	    src  => 'cmdline',
+	    args => [ $arg ]
+	  };
+        push @{$options->{'vncServerExtraArgs'}}, $pendingExtraArg;
+	undef $pendingExtraArg if defined $val;
       }
     }
   }
@@ -1568,27 +1634,7 @@ sub main {
   my $vncStartup = $options->{'vncStartup'};
   $options->{'vncStartup'} = '__AUTO__' if defined $vncStartup;
 
-  my $vncUserConfig = undef;
-  if (-f File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf")) {
-    # User provided TigerVNC configuration found
-    $vncUserConfig = File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf");
-  } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf")) {
-    # This is deprecated rename it to tigervnc.conf
-    if (rename
-        File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf")
-      , File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf")) {
-      symlink "tigervnc.conf"
-        , File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf");
-      # User provided TigerVNC configuration found
-      $vncUserConfig = File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf");
-    } else {
-      # User provided TigerVNC configuration found
-      $vncUserConfig = File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf");
-    }
-  }
-  if (defined $vncUserConfig) {
-    &readConfigFile($options, "user", $vncUserConfig);
-  }
+  &readConfigFile($options, "user");
 
   {
     my $rc = &parseCmdLine($options);
@@ -1622,11 +1668,14 @@ sub main {
 
       my $userOptions = {};
       while (my ($key, $value) = each %{$options}) {
-        my $src = $options->{'src'}->{$key};
+        my $src = $options->{'src'}->{$key} // "undef";
         if ($src eq 'user' || $src eq 'cmdline') {
           $userOptions->{$key} = $value;
         }
       }
+      $userOptions->{'vncServerExtraArgs'} = [grep {
+	  $_->{'src'} eq 'user' || $_->{'src'} eq 'cmdline';
+	} @{$options->{'vncServerExtraArgs'}}];
       foreach my $optionParseEntry (@{&getOptionParseTable($userOptions)}) {
         my ($flags, $optname, $store) = @{$optionParseEntry};
         next unless $flags & &OPT_TIGERVNCSERVER;
@@ -1637,10 +1686,13 @@ sub main {
           push @cmd, "-$name=$value" if defined $value;
         } elsif ($optname =~ m/=/) {
           push @cmd, "-$name", $value if defined $value;
+	} elsif (!($optname =~ m/[:=]/)) {
+          push @cmd, "-$name" if defined $value;
         } else {
           die "Oops, can't parse $optname format!";
         }
       }
+      push @cmd, map { @{$_->{'args'}} } @{$userOptions->{'vncServerExtraArgs'}};
       if ($#{$userOptions->{'session'}} >= 0) {
         push @cmd, '--';
         push @cmd, @{$userOptions->{'session'}};
