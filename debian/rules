@@ -187,14 +187,15 @@ override_dh_auto_install:
 	  debian/tmp
 	find debian/tmp/usr/share/man -type f | while read line; do \
 	  echo "Rewriting and renaming $$line into $$line.gz" ; \
-	  sed -e 's/\<vncviewer\>/xtigervncviewer/g' \
-	      -e 's/\<vncpasswd\>/tigervncpasswd/g' \
-	      -e 's/\<vncconfig\>/tigervncconfig/g' \
-	      -e 's/\<vncserver\>/tigervncserver/g' \
-	      -e 's/\<vncsession\>/tigervncsession/g' \
-	      -e 's/\<x0vncserver\>/x0tigervncserver/g' \
-	      -e 's/\<Xvnc\>/Xtigervnc/g' \
-	      -e 's/\<tigervnc\/tigervnc/tigervnc\/vnc/g' \
+	  sed -e 's/\(\<\|\\f[IBP]\)vncviewer\>/\1xtigervncviewer/g' \
+	      -e 's/\(\<\|\\f[IBP]\)vncpasswd\>/\1tigervncpasswd/g' \
+	      -e 's/\(\<\|\\f[IBP]\)vncconfig\>/\1tigervncconfig/g' \
+	      -e 's/\(\<\|\\f[IBP]\)vncserver\>/\1tigervncserver/g' \
+	      -e 's/\(\<\|\\f[IBP]\)vncsession\>/\1tigervncsession/g' \
+	      -e 's/\(\<\|\\f[IBP]\)X0VNCSERVER\>/\1x0tigervncserver/g' \
+	      -e 's/\(\<\|\\f[IBP]\)x0vncserver\>/\1x0tigervncserver/g' \
+	      -e 's/\(\<\|\\f[IBP]\)Xvnc\>/\1Xtigervnc/g' \
+	      -e 's/\(\<\|\\f[IBP]\)tigervnc\/tigervnc/\1tigervnc\/vnc/g' \
 	      $$line | \
 	    gzip -9 > $$line.gz; \
 	  rm -f $$line; \
