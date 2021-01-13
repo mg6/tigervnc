@@ -44,9 +44,7 @@
 # This section contains entries that should be true for all users.
 
 # $fontPath should be a comma separated list of fonts to be added to the font
-#           path. If not specified, and $XFConfigPath is valid, vncserver
-#           will read the $fontPath from there. If both are not set, the
-#           default will apply.
+#           path. If not specified, the default will apply.
 # Example:
 #	$fontPath = "tcp/localhost:7100"; # would force Xtigervnc to use xfs.
 # Example:
@@ -60,10 +58,6 @@
 #	$fontPath .= "/usr/share/fonts/X11/75dpi,";
 #
 # Default: $fontPath = undef; # Use Xtigervnc built-in default font path.
-
-# Use Xtigervnc built-in default font path even if $XFConfigPath is present
-# and contains FontPath directives.
-$fontPath = undef;
 
 # $PAMService is the PAM service used for plain password authentication
 #             if one of the security types Plain, TLSPlain, and

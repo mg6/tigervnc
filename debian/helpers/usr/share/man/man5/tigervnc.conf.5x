@@ -9,7 +9,7 @@
 .\" License as specified in the file COPYING that comes with the
 .\" Debian GNU/Linux distribution.
 .\"
-.TH tigervnc.conf 5x "Nov 10th, 2020" "TigerVNC 1.11.0" "Virtual Network Computing"
+.TH tigervnc.conf 5x "Jan 13th, 2021" "TigerVNC 1.11.0" "Virtual Network Computing"
 .SH NAME
 tigervnc.conf \- configuration files for Virtual Network Computing
 .SH SYNOPSIS
@@ -81,39 +81,9 @@ You must end a line with a semicolon.
 The options are given with their default value if this is known.
 
 .TP
-.IR $vncClasses\ \| =\ " /var/www/vnc """;
-Should be the path to the java classes of the server.
-.TP
-.IR $baseHttpPort\ \| =\  undef ";
-This is the port base for the mini-HTTP server that is built-in to
-.BR Xtigervnc (1) .
-The real http port will be derived from this base plus the display number.
-.TP
-.IR $XFConfigPath\ \| =\ " /etc/X11/xorg.conf """;
-Can be set to the system
-.I xorg.conf
-file. This will be
-parsed to gain default values for
-.IR $fontPath .
-.\"and
-.\".IR $colorPath .
-If you want to disable this feature, point it to an
-invalid file,
-.I /invalid
-for example.
-.TP
 .IR $fontPath
 Should be a comma separated list of fonts to be added to the font
-path. If not specified, and
-.I $XFConfigPath
-is valid, tigervncserver will read the $fontPath from there. If both are
-not set, the default will apply.
-.\".TP
-.\".IR $colorPath
-.\"should be the RGB file to be used by X. This can also be taken from the
-.\".I XF86Config
-.\"file if specified by
-.\".IR $XFConfigPath .
+path. If not specified, the default will apply.
 .TP
 .IR $PAMService\ \| =\ " tigervnc """;
 This parameter specifies the PAM service used for plain password authentication if one of the security types \fB Plain\fP,\fB TLSPlain\fP, or\fB X509Plain\fP is used.

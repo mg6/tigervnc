@@ -2,14 +2,14 @@
 .\" ** The above line should force tbl to be a preprocessor **
 .\" Man page for tigervncserver
 .\"
-.\" Copyright (C) 2016 - 2020 Joachim.Falk@gmx.de
+.\" Copyright (C) 2016 - 2021 Joachim.Falk@gmx.de
 .\" Copyright (C) Tristan Richardson RealVNC Ltd. and others.
 .\"
 .\" You may distribute under the terms of the GNU General Public
 .\" License as specified in the file COPYING that comes with the
 .\" Debian GNU/Linux distribution.
 .\"
-.TH tigervncserver 1 "Nov 10th, 2020" "TigerVNC 1.11.0" "Virtual Network Computing"
+.TH tigervncserver 1 "Jan 13th, 2021" "TigerVNC 1.11.0" "Virtual Network Computing"
 .SH NAME
 tigervncserver \- start or stop a TigerVNC server
 .SH SYNOPSIS
@@ -41,10 +41,6 @@ tigervncserver \- start or stop a TigerVNC server
 .RB [ \-xstartup
 .IR script ]
 .RB [ \-rfbport
-.IR port# ]
-.RB [ \-httpPort
-.IR port# ]
-.RB [ \-baseHttpPort
 .IR port# ]
 .RB [ \-SecurityTypes
 .IR sec-types ]
@@ -227,16 +223,6 @@ This is useful to run full-screen applications.
 .B \-rfbport \fIport#\fP
 Specifies the TCP port on which Xtigervnc listens for connections from viewers (the protocol used in VNC is called RFB - "remote framebuffer").
 The default is 5900 plus the display number display#.
-.
-.TP
-.B \-httpPort \fIport#\fP
-Specifies the port on which the mini-HTTP server runs.
-On default, the server is not started.
-.
-.TP
-.B \-baseHttpPort \fIport#\fP
-Specifies the base for the port number on which the mini-HTTP server runs.
-The real\fB \-httpPort\fP option will be derived from this base plus the display number.
 .
 .TP
 .B \-SecurityTypes \fIsec-types\fP
