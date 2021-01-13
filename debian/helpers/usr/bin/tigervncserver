@@ -557,11 +557,39 @@ sub readConfigFile($$) {
       }
     }
     while (my $line = <$configFileFh>) {
-      next if $line =~ /^#/;
-      if (my ($k, $v) = $line =~ /^\s*(\w+)\s*=\s*(.+)$/) {
-	&{$lowCase{lc($k)}}($v);
-      } elsif ($line =~ m/^\s*(\S+)/) {
-	&{$lowCase{lc($k)}}(1);
+      chomp $line; $line =~ s/#.*$//;
+      next if $line =~ /^\s*$/;
+      if ($line =~ /^\s*(\w+)\s*=\s*(.*)$/) {
+	my ($k, $v) = ($1, $2);
+	chomp $v;
+	if (defined $lowCase{lc($k)}) {
+	  &{$lowCase{lc($k)}}($v);
+	} else {
+	  $options->{'vncServerExtraArgs'} = [grep {
+	      $_->{'name'} ne $k
+	    } @{$options->{'vncServerExtraArgs'}}];
+	  push @{$options->{'vncServerExtraArgs'}}, {
+	      name => $k,
+	      src  => $desc,
+	      args => [ "-$k", $v ]
+	    };
+	}
+      } elsif ($line =~ m/^\s*(\w+)\s*$/) {
+	my ($k) = ($1);
+	if (defined $lowCase{lc($k)}) {
+	  &{$lowCase{lc($k)}}(1);
+	} else {
+	  $options->{'vncServerExtraArgs'} = [grep {
+	      $_->{'name'} ne $k
+	    } @{$options->{'vncServerExtraArgs'}}];
+	  push @{$options->{'vncServerExtraArgs'}}, {
+	      name => $k,
+	      src  => $desc,
+	      args => [ "-$k" ]
+	    };
+	}
+      } else {
+	print STDERR "$PROG: Warning: Can't parse '$line' from config file $configFile!\n";
       }
     }
     $configFileFh->close();
