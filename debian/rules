@@ -164,6 +164,10 @@ override_dh_auto_install:
 	  $(DEB_DESTDIR)/usr/bin/xvncviewer
 	mv $(DEB_DESTDIR)/usr/share/man/man1/vncviewer.1 \
 	  $(DEB_DESTDIR)/usr/share/man/man1/xvncviewer.1
+	mv $(DEB_DESTDIR)/usr/bin/x0vncserver \
+	  $(DEB_DESTDIR)/usr/bin/X0vnc
+	mv $(DEB_DESTDIR)/usr/share/man/man1/x0vncserver.1 \
+	  $(DEB_DESTDIR)/usr/share/man/man1/X0vnc.1
 	mv $(DEB_DESTDIR)/usr/share/applications/vncviewer.desktop \
 	  $(DEB_DESTDIR)/usr/share/applications/xvncviewer.desktop
 	mkdir -p $(DEB_DESTDIR)/usr/share/icons/hicolor/scalable/apps
@@ -192,8 +196,8 @@ override_dh_auto_install:
 	      -e 's/\(\<\|\\f[IBP]\)vncconfig\>/\1tigervncconfig/g' \
 	      -e 's/\(\<\|\\f[IBP]\)vncserver\>/\1tigervncserver/g' \
 	      -e 's/\(\<\|\\f[IBP]\)vncsession\>/\1tigervncsession/g' \
-	      -e 's/\(\<\|\\f[IBP]\)X0VNCSERVER\>/\1x0tigervncserver/g' \
-	      -e 's/\(\<\|\\f[IBP]\)x0vncserver\>/\1x0tigervncserver/g' \
+	      -e 's/\(\<\|\\f[IBP]\)X0VNCSERVER\>/\1X0tigervnc/g' \
+	      -e 's/\(\<\|\\f[IBP]\)x0vncserver\>/\1X0tigervnc/g' \
 	      -e 's/\(\<\|\\f[IBP]\)Xvnc\>/\1Xtigervnc/g' \
 	      -e 's/\(\<\|\\f[IBP]\)tigervnc\/tigervnc/\1tigervnc\/vnc/g' \
 	      $$line | \

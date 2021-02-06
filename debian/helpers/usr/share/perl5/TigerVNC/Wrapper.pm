@@ -1,0 +1,1069 @@
+package TigerVNC::Wrapper;
+
+# Below is documentation for your module. You'd better edit it!
+=pod
+
+=head1 NAME
+
+TigerVNC::Wrapper - TigerVNC server management
+
+=head1 SYNOPSIS
+
+  use TigerVNC::Config;
+  use TigerVNC::Wrapper;
+
+  my $options = { wrapperMode => 'tigervncserver' };
+
+  # First, we ensure that we're operating in a sane environment.
+  &sanityCheck($options);
+
+  # Next, parses the system /etc/tigervnc/vncserver-config-defaults and the user
+  # ~/.vnc/tigervnc.conf configuration file as well as processes the command line.
+  &getConfig($options);
+
+  if ($options->{'kill'}) {
+    my $err = &killVncServers($options);
+    exit($err ? 1 : 0);
+  } elsif ($options->{'list'}) {
+    &listVncServers(\*STDOUT, $options);
+    exit 0;
+  } else {
+    exit &startVncServer($options);
+  }
+
+=head1 DESCRIPTION
+
+This module starts either a B<Xtigervnc> or B<X0tigervnc> server.
+
+=cut
+
+use strict;
+use warnings;
+
+use File::Path;
+use File::Spec;
+use File::Basename qw(dirname basename);
+use File::ReadBackwards;
+use DirHandle;
+use File::stat;
+use IO::File;
+use Fcntl qw(SEEK_SET SEEK_CUR SEEK_END);
+use Socket;
+use Time::HiRes qw(usleep);
+use Errno qw(:POSIX);
+use POSIX ":sys_wait_h";
+
+use TigerVNC::Common;
+use TigerVNC::Config;
+
+=pod
+
+=head1 EXPORTS
+
+=over 4
+
+=item listVncServers
+
+=item killVncServers
+
+=item startVncServer
+
+=back
+
+=cut
+
+use Exporter qw(import);
+
+# Items to export into callers namespace by default. Note: do not export
+# names by default without a very good reason. Use EXPORT_OK instead.
+# Do not simply export all your public functions/methods/constants.
+our @EXPORT = qw(
+  listVncServers
+  killVncServers
+  startVncServer
+);
+
+our @EXPORT_OK = qw(
+);
+
+# This allows declaration
+#
+#   use UDNSC::ConfigParser ':all';
+#
+# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
+# will save memory.
+our %EXPORT_TAGS = (
+# 'all' => \@EXPORT_OK,
+);
+
+our $VERSION = '1.11-1';
+
+##
+## Set global constants
+##
+#
+#=pod
+#
+#=head1 GLOBALS
+#
+#=over 4
+#
+#=item $PROG
+#
+#The program using this package.
+#
+#=back
+#
+#=cut
+#
+## Get the program name
+#our $PROG = basename($0);
+
+our $MAGIC = '3NI3X0 ';
+
+=pod
+
+=head1 FUNCTIONS
+
+=cut
+
+#
+# Check if tcp port is available
+#
+sub checkTCPPortUsed {
+  my ($port) = @_;
+  my $proto  = getprotobyname('tcp');
+
+  socket(S, AF_INET, SOCK_STREAM, $proto) || die "$PROG: socket failed: $!";
+  setsockopt(S, SOL_SOCKET, SO_REUSEADDR, pack("l", 1)) || die "$PROG: setsockopt failed: $!";
+  if (!bind(S, sockaddr_in($port, INADDR_ANY))) {
+    # print "$PROG: bind ($port) failed: $!\n";
+    close(S);
+    return 1;
+  }
+  close(S);
+  return 0;
+}
+
+#
+# checkRFBPortUsed checks if the given RFB port is used by vnc.
+# A RFB port n is used if something is listening on the VNC server port
+# (5900+n).
+#
+
+sub checkRFBPortUsed{
+  my ($n) = @_;
+  return &checkTCPPortUsed(5900 + $n);
+}
+
+#
+# checkDisplayNumberAvailable checks if the given display number is available.
+# A display number n is taken if something is listening on the X server port
+# (6000+n) or at least one of the X11 lock files /tmp/.X$n-lock or
+# /tmp/.X11-unix/X$n is present.
+#
+
+sub checkDisplayNumberAvailable {
+  my ($n) = @_;
+
+  return 0 if &checkTCPPortUsed(6000 + $n);
+
+  my $displayLock = 0;
+
+  if (-e "/tmp/.X$n-lock") {
+    print "\nWarning: $HOSTFQDN:$n is taken because of /tmp/.X$n-lock\n";
+    print "Remove this file if there is no X server $HOSTFQDN:$n\n";
+    $displayLock = 1;
+  }
+
+  if (-e "/tmp/.X11-unix/X$n") {
+    print "\nWarning: $HOSTFQDN:$n is taken because of /tmp/.X11-unix/X$n\n";
+    print "Remove this file if there is no X server $HOSTFQDN:$n\n";
+    $displayLock = 1;
+  }
+
+  return 0 if $displayLock;
+
+  return 1;
+}
+
+#
+# getDisplayNumber gets the lowest available display number.  A display number
+# n is taken if something is listening on the VNC server port (5900+n) or the
+# X server port (6000+n).
+#
+
+sub getDisplayNumber($) {
+  my ($rfbport) = @_;
+
+  if (defined($rfbport) && $rfbport >= 5900 && $rfbport <= 5999) {
+    my $n = $rfbport - 5900;
+    return $n if &checkDisplayNumberAvailable($n);
+  }
+  foreach my $n (1..99) {
+    return $n if &checkDisplayNumberAvailable($n);
+  }
+
+  print STDERR "$PROG: no free display number on $HOSTFQDN.\n";
+  exit -1;
+}
+
+#
+# quotedString returns a string which yields the original string when parsed
+# by a shell.
+#
+
+sub quotedString {
+  my ($in) = @_;
+  $in =~ s/\'/\'\"\'\"\'/g;
+  return "'$in'";
+}
+
+sub pidFile {
+  my ($options, $rfbport) = @_;
+  $rfbport = $options->{'rfbport'} unless defined $rfbport;
+  return File::Spec->catfile($options->{'vncUserDir'},
+    "${HOSTFQDN}:${rfbport}.pid");
+}
+
+sub x509CertFiles {
+  my ($options) = @_;
+  return (
+    "$options->{'vncUserDir'}/${HOSTFQDN}-SrvCert.pem",
+    "$options->{'vncUserDir'}/${HOSTFQDN}-SrvKey.pem");
+}
+
+sub desktopLog {
+  my ($options, $rfbport) = @_;
+  $rfbport = $options->{'rfbport'} unless defined $rfbport;
+  return File::Spec->catfile($options->{'vncUserDir'},
+    "${HOSTFQDN}:${rfbport}.log");
+}
+
+sub cleanStale($$$$) {
+  my ($options, $nr, $usedDisplay, $stale) = @_;
+  my $pidFile  = &pidFile($options,$nr);
+  my @X11Locks = ("/tmp/.X$usedDisplay-lock", "/tmp/.X11-unix/X$usedDisplay");
+
+  # vnc pidfile stale
+  my $msg = "";
+  if (-e $pidFile) {
+    unless ($options->{'dry-run'} || unlink($pidFile) || $! == &ENOENT) {
+      print STDERR "$PROG: Warning: Can't clean stale pidfile '$pidFile': $!\n";
+    } elsif ($stale) {
+      print "Cleaning stale pidfile '$pidFile'!\n";
+    }
+  }
+  if ($options->{'wrapperMode'} eq 'tigervncserver') {
+    if (!$stale || !&checkTCPPortUsed(6000 + $usedDisplay)) {
+      foreach my $entry (grep { -e $_ } @X11Locks) {
+        unless ($options->{'dry-run'} || unlink($entry) || $! == &ENOENT) {
+          print STDERR "$PROG: Warning: Can't clean stale X11 lock '$entry': $!\n";
+        } else {
+          print "Cleaning stale X11 lock '$entry'!\n";
+        }
+      }
+    }
+  }
+}
+
+sub runningVncServers {
+  my ($options) = @_;
+  my %runningVncServers = ();
+
+  my $d = DirHandle->new($options->{'vncUserDir'});
+  if (defined $d) {
+    while (defined(my $entry = $d->read)) {
+      next unless $entry =~ m/^\Q$HOSTFQDN\E:(\d+)\.pid$/;
+      my $nr = $1;
+      my ($pid, $stale);
+      {
+        my $pidFile     = File::Spec->catfile($options->{'vncUserDir'}, $entry);
+        my $pidFileFh   = IO::File->new($pidFile, "r");
+        unless (defined $pidFileFh) {
+          print STDERR "$PROG: Warning: Can't open pid file '$pidFile': $!\n";
+          next;
+        }
+        unless (($pidFileFh->getline()//"") =~ m/^([0-9]+)$/) {
+          print STDERR "$PROG: Warning: Can't parse pid file '$pidFile'!\n";
+          next;
+        }
+        $pid   = int($1);
+        $stale = !kill(0, $pid);
+      }
+
+      my ($usedDisplay, $rfbport) = (undef, undef);
+      if ($nr <= 99) {
+        $usedDisplay = $nr;
+        $rfbport     = $nr + 5900;
+      } else {
+        $rfbport     = $nr;
+        $usedDisplay = $nr - 5900 if $nr >= 5900 && $nr <= 5999;
+      }
+      my $name    = "$HOSTFQDN:$usedDisplay";
+      my $client  = undef;
+      my $server  = "Xtigervnc";
+      my $DISPLAY = -e "/tmp/.X11-unix/X${usedDisplay}"
+        ? ":${usedDisplay}"
+        : "$HOSTFQDN:${usedDisplay}";
+      {
+        my $logFile     = desktopLog($options, $nr);
+        my $logFileFh   = File::ReadBackwards->new($logFile);
+        if (defined $logFileFh) {
+          my $line;
+          while (defined ($line = $logFileFh->readline)) {
+            chomp $line;
+            if ($line =~ m/Listening for VNC connections.* port\s+(\d+)/) {
+              $rfbport = $1; last;
+            } elsif ($line =~ m/^\Q$MAGIC\ENew (\w+) server '([^']*)' on port (\d+) for display (.*)\.$/) {
+             # 3NI3X0 New X0tigervnc server 'xerstin.jfalk.de:21 (joachim)' on port 5921 for display :20.
+             $server = $1; $name = $2; $rfbport = $3; $DISPLAY = $4;
+             $usedDisplay = $1 if $DISPLAY =~ m/:(\d+)(?:\.\d+)?$/;
+             last;
+            } elsif ($line =~ m/^\Q$MAGIC\EUse (.*) to connect to the VNC server\.$/) {
+              # 3NI3X0 Use xtigervncviewer -SecurityTypes X509Plain -X509CA /home/joachim/.vnc/xerstin.jfalk.de-SrvCert.pem xerstin.jfalk.de:21 to connect to the VNC server.
+              $client = $1;
+            }
+          }
+        }
+      }
+      unless (defined $client) {
+        # Example client connection
+        $client = "xtigervncviewer $HOSTFQDN:$rfbport";
+      }
+      if ($options->{'cleanstale'} && $stale) {
+        &cleanStale($options, $nr, $usedDisplay, 1);
+        next;
+      }
+      # running vnc if !$options->{'cleanstale'}
+      $runningVncServers{$nr} = {
+          'name'        => $name,
+          'server'      => $server,
+          'client'      => $client,
+          'pid'         => $pid,
+          'DISPLAY'     => $DISPLAY,
+          'usedDisplay' => $usedDisplay,
+          'rfbport'     => $rfbport,
+          'stale'       => $stale,
+        };
+    }
+    undef $d;
+  }
+  return \%runningVncServers;
+}
+
+sub matchVncServers($$$) {
+  my ($options, $runningVncServers, $includeStale) = @_;
+
+  my $dn      = $options->{'displayNumber'};
+  my $rfbport = $options->{'rfbport'};
+
+  my @allVNCs = keys %{$runningVncServers};
+  unless ($includeStale) {
+    @allVNCs = grep { !$runningVncServers->{$_}->{'stale'} } @allVNCs;
+  }
+  my @vncs = @allVNCs;
+  if (defined($dn) && $dn ne '*') {
+    @vncs = grep {
+      $runningVncServers->{$_}->{'usedDisplay'} eq $dn } @vncs;
+  }
+  if (defined $rfbport) {
+    @vncs = grep {
+      $runningVncServers->{$_}->{'rfbport'} eq $rfbport } @vncs;
+  } elsif (@vncs == 0 && defined($dn) && $dn ne '*') {
+    $rfbport = $dn <= 99 ? 5900 + $dn : $dn;
+    @vncs = grep {
+      $runningVncServers->{$_}->{'rfbport'} eq $rfbport } @allVNCs;
+  }
+  return @vncs;
+}
+
+=pod
+
+=over 4
+
+=item listVncServers
+
+List the specified VNC server.
+
+=cut
+
+sub listVncServers {
+  my ($fh, $options, $vncs, $runningVncServers) = @_;
+
+  unless (defined $runningVncServers) {
+    $runningVncServers = &runningVncServers($options);
+  }
+  unless (defined $vncs) {
+    $vncs = [&matchVncServers($options, $runningVncServers, 1)];
+  }
+  # Sort running VNC server list
+  $vncs = [sort {
+      my $av = $runningVncServers->{$a}->{'usedDisplay'};
+      my $bv = $runningVncServers->{$b}->{'usedDisplay'};
+      return -1 if $av < $bv;
+      return  1 if $av > $bv;
+      $av = $runningVncServers->{$a}->{'rfbport'};
+      $bv = $runningVncServers->{$b}->{'rfbport'};
+      return -1 if $av < $bv;
+      return  1 if $av > $bv;
+      return  0;
+    } @{$vncs}];
+
+  print $fh
+    "\n".
+    "TigerVNC server sessions:\n".
+    "\n".
+    "X DISPLAY #\tRFB PORT #\tPROCESS ID\tSERVER\n";
+  foreach my $vnc (@{$vncs}) {
+    next unless defined $runningVncServers->{$vnc};
+    my $stale   = $runningVncServers->{$vnc}->{'stale'}
+      ? " (stale)" : "";
+    my $rfbport = $runningVncServers->{$vnc}->{'rfbport'};
+    my $dn      = $runningVncServers->{$vnc}->{'usedDisplay'};
+    my $pid     = $runningVncServers->{$vnc}->{'pid'};
+    my $server  = $runningVncServers->{$vnc}->{'server'};
+    printf $fh ":%-10d\t%-10d\t%-10s\t%s\n", $dn, $rfbport, $pid.$stale, $server;
+  }
+}
+
+=pod
+
+=item killVncServers
+
+Kill the specified VNC server.
+
+=cut 
+
+#
+# killVncServers
+#
+
+sub killVncServers {
+  my ($options, $vncs, $runningVncServers) = @_;
+  my $retval = 0;
+
+  unless (defined $runningVncServers) {
+    $runningVncServers = &runningVncServers($options);
+  }
+  unless (defined $vncs) {
+    $vncs = [&matchVncServers($options, $runningVncServers)];
+    if (@{$vncs} == 0) {
+      if (!defined $options->{'rfbport'} &&
+          (!defined $options->{'displayNumber'} || $options->{'displayNumber'} eq '*')) {
+        print STDERR "$PROG: No VNC server running for this user!\n";
+      } else {
+        print STDERR "$PROG: No matching VNC server running for this user!\n";
+      }
+      $retval = 1;
+    } elsif (@{$vncs} > 1) {
+      print STDERR "$PROG: This is ambiguous. Multiple VNC servers are running for this user!\n";
+      &listVncServers(\*STDERR, $options, $vncs, $runningVncServers);
+      $retval = 1;
+      $vncs = [];
+    }
+  }
+
+  $SIG{'CHLD'} = 'IGNORE';
+  foreach my $vnc (@{$vncs}) {
+    my $stale       = 0;
+    my $pid         = $runningVncServers->{$vnc}->{'pid'};
+    my $usedDisplay = $runningVncServers->{$vnc}->{'usedDisplay'};
+
+    next unless defined $pid;
+    print "Killing Xtigervnc process ID $pid...";
+    unless ($options->{'dry-run'}) {
+      if (kill('TERM', $pid)) {
+        my $i = 10;
+        for (; $i >= 0; $i = $i-1) {
+          last unless kill(0, $pid);
+          usleep 100000;
+        }
+        if ($i >= 0) {
+          print " success!\n";
+        } else {
+          $retval = 1;
+          print " which seems to be deadlocked. Using SIGKILL!\n";
+          unless (kill('KILL', $pid) || $! == &ESRCH) {
+            print STDERR "Can't kill '$pid': $!\n";
+            next;
+          }
+        }
+      } elsif ($! == &ESRCH) {
+        print " which was already dead\n";
+        $stale = 1;
+      } else {
+        $retval = 1;
+        print STDERR "\nCan't kill '$pid': $!\n";
+        next;
+      }
+    }
+    &cleanStale($options, $vnc, $usedDisplay, $stale);
+
+    # If option -clean is given, also remove the logfile
+    if (!$options->{'dry-run'} && $options->{'clean'}) {
+      my $desktopLog = &desktopLog($options, $vnc);
+      unless (unlink($desktopLog) || $! == &ENOENT) {
+        $retval = 1;
+        print STDERR "Can't remove '$desktopLog': $!\n";
+      }
+    }
+  }
+  $SIG{'CHLD'} = 'DEFAULT';
+  return $retval;
+}
+
+# Make an X server cookie
+sub CreateMITCookie {
+  my ( $options ) = @_;
+  my $displayNumber  = $options->{'displayNumber'};
+  my $xauthorityFile = $options->{'xauthorityFile'};
+  my $cookie = `mcookie`; # try mcookie
+
+  unless (defined $cookie) {
+    # mcookie failed => make an X server cookie the old fashioned way
+    srand(time+$$+unpack("L",`cat $options->{'vncPasswdFile'}`));
+    $cookie = "";
+    for (1..16) {
+      $cookie .= sprintf("%02x", int(rand(256)));
+    }
+  } else {
+    chomp $cookie;
+  }
+  system(getCommand("xauth"), "-f", "$xauthorityFile", "add", "$HOSTFQDN:$displayNumber", ".", "$cookie");
+  system(getCommand("xauth"), "-f", "$xauthorityFile", "add", "$HOST/unix:$displayNumber", ".", "$cookie");
+}
+
+# Make sure the user has a password.
+sub CreateVNCPasswd {
+  my ( $options ) = @_;
+
+  my $passwordArgSpecified =
+    ($options->{'src'}{'vncPasswdFile'}//"undef") eq "cmdline";
+
+  # Check whether VNC authentication is enabled, and if so, prompt the user to
+  # create a VNC password if they don't already have one.
+  return if !$options->{'vncAuthEnabled'} || $passwordArgSpecified;
+  my $vncPasswdFile = $options->{'vncPasswdFile'};
+  my $st = stat($vncPasswdFile);
+
+  if (!defined($st) || ($st->mode & 077)) {
+    print "\nYou will require a password to access your desktops.\n\n";
+    unless (unlink($vncPasswdFile) || $! == &ENOENT) {
+      print STDERR "Can't remove old vnc passwd file '$vncPasswdFile': $!!\n";
+      exit 1;
+    }
+    system(getCommand("tigervncpasswd"), $vncPasswdFile);
+    exit 1 if (($? >> 8) != 0);
+  }
+}
+
+# Make sure the user has a x509 certificate.
+sub CreateX509Cert {
+  my ( $options ) = @_;
+
+  # Check whether X509 encryption is enabled, and if so, create
+  # a self signed certificate if not already present or specified
+  # on the command line.
+  return if !$options->{'x509CertRequired'} ||
+            defined $options->{'X509Cert'} ||
+            defined $options->{'X509Key'};
+  ($options->{'X509Cert'}, $options->{'X509Key'}) =
+    &x509CertFiles($options);
+
+  my $st = stat($options->{'X509Key'});
+  if (!defined($st) || ($st->mode & 077) || !-f $options->{'X509Cert'}) {
+    print "\nYou will require a certificate to use X509None, X509Vnc, or X509Plain.\n";
+    print "I will generate a self signed certificate for you in $options->{'X509Cert'}.\n\n";
+    unless (unlink($options->{'X509Cert'}) || $! == &ENOENT) {
+      print STDERR "Can't remove old X509Cert file '$options->{'X509Cert'}': $!!\n";
+      exit 1;
+    }
+    unless (unlink($options->{'X509Key'}) || $! == &ENOENT) {
+      print STDERR "Can't remove old X509Key file '$options->{'X509Key'}': $!!\n";
+      exit 1;
+    }
+    my $toSSLFh;
+    my @CMD = split(/\s+/, $options->{'sslAutoGenCertCommand'});
+    $CMD[0] = &getCommand($CMD[0]);
+    push @CMD, "-config", "-" unless grep { $_ eq "-config" } @CMD;
+    push @CMD, "-out", $options->{'X509Cert'} unless grep { $_ eq "-out" } @CMD;
+    push @CMD, "-keyout", $options->{'X509Key'} unless grep { $_ eq "-keyout" } @CMD;
+    unless (defined open($toSSLFh, "|-", @CMD)) {
+      print STDERR "Can't start openssl pipe: $!!\n";
+      exit 1;
+    }
+    my $configSSLFh;
+    unless (defined open($configSSLFh, "<", "$SYSTEMCONFIGDIR/ssleay.cnf")) {
+      print STDERR "Can't open openssl configuration template $SYSTEMCONFIGDIR/ssleay.cnf: $!\n";
+      exit 1;
+    }
+    while (my $line = <$configSSLFh>) {
+      $line =~ s/\@HostName\@/$HOSTFQDN/;
+      print $toSSLFh $line;
+    }
+    close $configSSLFh;
+    close $toSSLFh;
+    if ($? != 0) {
+      unlink $options->{'X509Cert'};
+      unlink $options->{'X509Key'};
+      print STDERR "The openssl command ", join(' ', @CMD), " failed: $?\n";
+      exit 1;
+    }
+  }
+}
+
+=pod
+
+=item startVncServer
+
+Start an I<Xtigervnc> or I<X0tigervnc> server.
+
+  &startVncServer($options);
+
+=cut 
+
+# Now start the X VNC Server
+sub startVncServer {
+  my ($options) = @_;
+
+  # Read in mandatory configuration information
+  &readConfigFile($options, "mandatory");
+
+  unless (defined $options->{'PlainUsers'}) {
+    $options->{'PlainUsers'} = $USER;
+  }
+  unless (defined $options->{'PAMService'}) {
+    if (-f '/etc/pam.d/vnc') {
+      $options->{'PAMService'} = 'vnc';
+    } else {
+      # Default vnc service not present. Hence, we fall back to our own tigervnc service.
+      $options->{'PAMService'} = 'tigervnc';
+    }
+  }
+
+  unless (defined $options->{'vncPasswdFile'}) {
+    $options->{'vncPasswdFile'} =
+      File::Spec->catfile($options->{'vncUserDir'}, "passwd");
+  }
+  if (defined $options->{'session'} &&
+      ref($options->{'session'}) eq '') {
+    $options->{'session'} = [split(qr{\s+}, $options->{'session'})];
+  } elsif (!defined $options->{'session'} ||
+           ref($options->{'session'}) ne 'ARRAY') {
+    $options->{'session'} = [];
+  }
+  if (defined $options->{'localhost'}) {
+    $options->{'localhost'} = $options->{'localhost'} =~ m/^(?:yes|true|1)$/i;
+  }
+  unless (defined $options->{'SecurityTypes'}) {
+    if (!defined($options->{'localhost'}) || $options->{'localhost'}) {
+      $options->{'SecurityTypes'} = 'VncAuth';
+      $options->{'localhost'}     = 1;
+    } else {
+      $options->{'SecurityTypes'} = 'VncAuth,TLSVnc';
+      $options->{'localhost'}     = 0;
+    }
+  }
+  $options->{'vncAuthEnabled'} = 0;
+  $options->{'noneAuthEnabled'} = 0;
+  $options->{'plainAuthEnabled'} = 0;
+  $options->{'x509CertRequired'} = 0;
+  $options->{'haveSSLEncryption'} = 0;
+  foreach my $securityType (split(',', $options->{'SecurityTypes'})) {
+    $options->{'vncAuthEnabled'} = 1    if $securityType =~ m/^(?:.*vnc|vncauth)$/i;
+    $options->{'noneAuthEnabled'} = 1   if $securityType =~ m/none$/i;
+    $options->{'plainAuthEnabled'} = 1  if $securityType =~ m/plain$/i;
+    $options->{'x509CertRequired'} = 1  if $securityType =~ m/^x509/i;
+    $options->{'haveSSLEncryption'} = 1 if $securityType =~ m/^(?:x509|tls)/i;
+  }
+
+  if ($options->{'plainAuthEnabled'} &&
+      $options->{'PAMService'} eq 'tigervnc' &&
+      ! -f '/etc/pam.d/tigervnc') {
+    print STDERR "$PROG: The tigervnc PAM servcice required for the security types\n";
+    print STDERR "\tPlain, TLSPlain, or X509Plain is not installed.\n";
+    &installPackageError("tigervnc-common");
+  }
+
+  unless (defined $options->{'localhost'}) {
+    # If we have no encrypted VNC connection security types or
+    # we have at least one *None security type in there, then
+    # we better only server VNC on localhost to be tunneled via
+    # ssh.
+    $options->{'localhost'} = !$options->{'haveSSLEncryption'}
+                           || $options->{'noneAuthEnabled'};
+  }
+  # PREVENT THE USER FROM EXPOSING A VNC SESSION WITHOUT AUTHENTICATION
+  # TO THE WHOLE INTERNET!!!
+  if (!$options->{'localhost'} && $options->{'noneAuthEnabled'} &&
+      !$options->{'I-KNOW-THIS-IS-INSECURE'}) {
+    print STDERR "$PROG: YOU ARE TRYING TO EXPOSE A VNC SERVER WITHOUT ANY\n";
+    print STDERR "AUTHENTICATION TO THE WHOLE INTERNET! I AM REFUSING TO COOPERATE!\n\n";
+    print STDERR "If you really want to do that, add the --I-KNOW-THIS-IS-INSECURE option!\n";
+    return -1;
+  }
+  if ($options->{'noneAuthEnabled'} &&
+      !$options->{'I-KNOW-THIS-IS-INSECURE'}) {
+    print STDERR "Please be aware that you are exposing your VNC server to all users on the\n";
+    print STDERR "local machine. These users can access your server without authentication!\n";
+  }
+
+  unless ($options->{'vncAuthEnabled'}) {
+    delete $options->{'vncPasswdFile'};
+  }
+  unless ($options->{'plainAuthEnabled'}) {
+    delete $options->{'PAMService'};
+    delete $options->{'PlainUsers'};
+  }
+  unless ($options->{'x509CertRequired'}) {
+    delete $options->{'X509Cert'};
+    delete $options->{'X509Key'};
+  }
+
+  my $runningVncServers = &runningVncServers($options);
+  my $haveOld = undef;
+  if ($options->{'useold'}) {
+    my @vncs = &matchVncServers($options, $runningVncServers);
+    if (@vncs == 1) {
+      $haveOld = $runningVncServers->{$vncs[0]};
+      $options->{'displayNumber'} = $haveOld->{'usedDisplay'};
+      $options->{'rfbport'}       = $haveOld->{'rfbport'};
+    } elsif (@vncs > 1) {
+      print STDERR "$PROG: This is ambiguous. Multiple vncservers are running for this user!\n";
+      &listVncServers(\*STDERR, $options, \@vncs, $runningVncServers);
+      return 1;
+    }
+  } 
+  unless (defined $options->{'displayNumber'}) {
+    # Find display number.
+    $options->{'displayNumber'} = &getDisplayNumber($options->{'rfbport'});
+  }
+  unless (defined $options->{'rfbport'}) {
+    $options->{'rfbport'} = 5900 + $options->{'displayNumber'};
+  }
+  unless (defined $options->{'desktopName'}) {
+    my $rfbport = $options->{'rfbport'};
+    $rfbport -= 5900 if $rfbport >= 5900 && $rfbport <= 5999;
+    $options->{'desktopName'} = "${HOSTFQDN}:$rfbport ($USER)";
+  }
+  if (defined $haveOld) {
+    my $DISPLAY = $haveOld->{'DISPLAY'};
+    print "\nReusing old VNC server '$options->{desktopName}' for display $DISPLAY.\n";
+    print "Use $haveOld->{'client'} to connect to the VNC server.\n";
+    return 0;
+  }
+  if ($options->{'wrapperMode'} eq 'tigervncserver') {
+    my $dn = $options->{'displayNumber'};
+    my @vncs = grep {
+      $runningVncServers->{$_}->{'usedDisplay'} eq $dn }
+      keys %{$runningVncServers};
+    foreach my $vnc (@vncs) {
+      next unless $runningVncServers->{$vnc}->{'stale'};
+      &cleanStale($options,$vnc,$dn,1);
+    }
+    @vncs = grep {
+      !$runningVncServers->{$_}->{'stale'} } @vncs;
+    if (@vncs > 0 || !&checkDisplayNumberAvailable($dn)) {
+      print STDERR "A X11 server is already running as :$dn on machine $HOSTFQDN\n";
+      return 1;
+    }
+  }
+  if (&checkTCPPortUsed($options->{'rfbport'})) {
+    my $rfbport = $options->{'rfbport'};
+    my @vncs = grep {
+        !$runningVncServers->{$_}->{'stale'} &&
+        ($runningVncServers->{$_}->{'rfbport'} eq $rfbport)
+      } keys %{$runningVncServers};
+    if ($rfbport >= 5900 && $rfbport <= 5999) {
+      $rfbport -= 5900;
+      print STDERR "A VNC server is already running as :$rfbport on machine $HOSTFQDN\n";
+    } elsif (@vncs > 0) {
+      print STDERR "A VNC server is already listening at port $rfbport on machine $HOSTFQDN\n";
+    } else {
+      print STDERR "Something else is already listening at port $rfbport on machine $HOSTFQDN\n";
+    }
+    return 1;
+  }
+
+  my $vncStartup = $options->{'vncStartup'};
+  my $desktopLog = &desktopLog($options);
+  my $pidFile    = &pidFile($options);
+
+  # Make sure the user has a password if required.
+  &CreateVNCPasswd($options);
+  # Make sure the user has a x509 certificate if required.
+  &CreateX509Cert($options);
+  &CreateMITCookie($options);
+
+  my $pidFileFh  = IO::File->new($pidFile, "w", 0644);
+  unless (defined $pidFileFh) {
+    print STDERR "$PROG: Can't create pid file '$pidFile': $!\n";
+    return 1;
+  }
+
+  my $desktopLogFh = IO::File->new($desktopLog, "a+");
+  seek($desktopLogFh, 0, SEEK_END);
+
+  my $xvncServerPid = undef;
+  {
+    my @cmd;
+    if ($options->{'wrapperMode'} eq 'tigervncserver') {
+      push @cmd, getCommand("Xtigervnc");
+      push @cmd, ":".$options->{'displayNumber'};
+    } else {
+      push @cmd, getCommand("X0tigervnc");
+    }
+    foreach my $optionParseEntry (@{&getOptionParseTable($options)}) {
+      my ($flags, $optname, $store) = @{$optionParseEntry};
+      if ($options->{'wrapperMode'} eq 'x0tigervncserver') {
+        next unless $flags & &OPT_X0TIGERVNC;
+      } else {
+        next unless $flags & &OPT_XTIGERVNC;
+      }
+      $optname =~ m/^([^:=|]*)/;
+      my $name = $1;
+      my $value = &{$store}($name);
+      if ($optname =~ m/:/) {
+        push @cmd, "-$name=$value" if defined $value;
+      } elsif ($optname =~ m/=/) {
+        push @cmd, "-$name", $value if defined $value;
+      } else {
+        die "Oops, can't parse $optname format!";
+      }
+    }
+#   push @cmd, '-pn';
+    push @cmd, map { @{$_->{'args'}} } @{$options->{'vncServerExtraArgs'}};
+
+    print join(" ",@cmd), "\n" if $options->{'verbose'};
+
+    my $xvncServerPid = fork();
+    die "Failed to fork: $!" if $xvncServerPid < 0;
+
+    if ($xvncServerPid == 0) {
+      # I am the child
+      $desktopLogFh->close();
+      open(OLDERR, '>&', \*STDERR); # save old STDERR
+      open(STDOUT, '>>', $desktopLog);
+      open(STDERR, '>>', $desktopLog);
+      STDERR->autoflush(1);
+      STDOUT->autoflush(1);
+      exec {$cmd[0]} (@cmd) or
+        print OLDERR "$PROG: Can't exec '".$cmd[0]."': $!\n";
+      exit 1;
+    }
+    $pidFileFh->print($xvncServerPid."\n");
+    $pidFileFh->close();
+
+    $runningVncServers = {
+        $options->{'rfbport'} => {
+            'name'        => "$HOSTFQDN:".$options->{'displayNumber'},
+            'pid'         => $xvncServerPid,
+            'rfbport'     => $options->{'rfbport'},
+            'usedDisplay' => $options->{'displayNumber'},
+          }
+      };
+    # Wait for Xtigervnc to start up
+    {
+      my $i = 300;
+      for (; $i >= 0; $i = $i-1) {
+        last if &checkTCPPortUsed($options->{'rfbport'});
+        if ($xvncServerPid == waitpid($xvncServerPid, WNOHANG)) { $i = -2; last; }
+        usleep 100000;
+      }
+      if ($options->{'wrapperMode'} eq 'tigervncserver') {
+        for (; $i >= 0; $i = $i-1) {
+          last if -e "/tmp/.X11-unix/X$options->{'displayNumber'}" ||
+                  &checkTCPPortUsed(6000 + $options->{'displayNumber'});
+          if ($xvncServerPid == waitpid($xvncServerPid, WNOHANG)) { $i = -2; last; }
+          usleep 100000;
+        }
+      }
+      $i = -2 unless kill(0, $xvncServerPid);
+      if ($i < 0) {
+        if (kill(0, $xvncServerPid)) {
+          &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
+        } else {
+          &cleanStale($options,$options->{'rfbport'},$options->{'displayNumber'},0);
+        }
+        my $header = "=================== tail $desktopLog ===================";
+        print STDERR "\n${header}\n";
+        while (my $line = <$desktopLogFh>) {
+          print STDERR $line;
+        }
+        print STDERR "\n".("=" x length $header)."\n\n";
+        print STDERR "$PROG: $cmd[0] did not start up, please look into '$desktopLog' to determine the reason! $i\n";
+        return -1;
+      }
+    }
+  }
+
+  # If the unix domain socket exists then use that (DISPLAY=:n) otherwise use
+  # TCP (DISPLAY=host:n)
+  my $DISPLAY = -e "/tmp/.X11-unix/X$options->{'displayNumber'}"
+    ? ":$options->{'displayNumber'}"
+    : "$HOSTFQDN:$options->{'displayNumber'}";
+  {
+    my $rfbport = $options->{'rfbport'};
+    my @status;
+    {
+      my $server = $options->{'wrapperMode'} eq 'tigervncserver'
+        ? 'Xtigervnc' : 'X0tigervnc';
+      push @status, "New $server server '$options->{desktopName}' on port $rfbport for display $DISPLAY.";
+    }
+    {
+      $rfbport -= 5900 if $rfbport >= 5900 && $rfbport <= 5999;
+      my @cmd = ("xtigervncviewer");
+      push @cmd, "-SecurityTypes", $options->{'SecurityTypes'};
+      push @cmd, "-X509CA", $options->{'X509Cert'} if $options->{'x509CertRequired'};
+      push @cmd, "-passwd", $options->{'vncPasswdFile'} if $options->{'vncAuthEnabled'};
+      push @cmd, $options->{'localhost'} =~ m/^(?:yes|true|1)$/i
+        ? ":$rfbport" : "$HOSTFQDN:$rfbport";
+      push @status, "Use ".join(" ", @cmd)." to connect to the VNC server.";
+    }
+    print "\n";
+    foreach my $status (@status) {
+      $desktopLogFh->print($MAGIC.$status."\n");
+      print $status."\n";
+    }
+    print "\n";
+    $desktopLogFh->flush();
+  }
+
+  if ($options->{'wrapperMode'} eq 'tigervncserver') {
+    unless (defined $vncStartup) {
+      if ($options->{'fg'} || $options->{'autokill'}) {
+        # Nothing to start and I should also kill the Xtigervnc server when the
+        # Xtigervnc-session terminates. Well, lets do so. What a pointless exercise.
+        &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
+      }
+      return 0;
+    }
+
+    # Run the X startup script.
+    print "Starting applications specified in $vncStartup\n";
+    print "Log file is $desktopLog\n\n";
+
+    $ENV{DISPLAY}    = $DISPLAY;
+    $ENV{VNCDESKTOP} = $options->{'desktopName'};
+    seek($desktopLogFh, 0, SEEK_END);
+
+    pipe RH, WH or die "Can't open pipe: $!";
+    my $childPid = $options->{'fg'} ? 0 : fork();
+
+    die "Failed to fork: $!" if $childPid < 0;
+
+    if ($childPid == 0) {
+      # I am the child
+      $desktopLogFh->close() unless $options->{'fg'};
+      my @cmd = ($vncStartup);
+      push @cmd, @{$options->{'session'}};
+      print join(" ",@cmd), "\n" if $options->{'verbose'};
+
+      open(OLDOUT, '>&', \*STDOUT); # save old STDOUT
+      open(OLDERR, '>&', \*STDERR); # save old STDERR
+      open(STDOUT, '>>', $desktopLog);
+      open(STDERR, '>>', $desktopLog);
+      STDERR->autoflush(1);
+      STDOUT->autoflush(1);
+      OLDERR->autoflush(1);
+      OLDOUT->autoflush(1);
+
+      $SIG{'ALRM'} = sub {
+          open(OLDERR, '>', '/dev/null') unless $options->{'fg'};
+          open(OLDOUT, '>', '/dev/null') unless $options->{'fg'};
+          syswrite WH, "OK"; close WH;
+          $SIG{'ALRM'} = 'DEFAULT';
+        };
+      # Wait for three seconds for erros to appear and to propagate to
+      # our parent if not in -fg mode.
+      alarm 3 unless $options->{'fg'};
+      $! = 0;
+      if (system {$cmd[0]} (@cmd)) {
+        if ($!) {
+          alarm 0; # this must not be before the if ($!) condition
+          print OLDERR "\n$PROG: Can't start ",
+            join(" ", map { &quotedString($_); } @cmd), ": $!!\n";
+        } else {
+          alarm 0; # this must not be before the if ($!) condition
+          print OLDERR "\n$PROG: Failed command ",
+            join(" ", map { &quotedString($_); } @cmd), ": $?!\n";
+        }
+        $SIG{'ALRM'} = 'DEFAULT';
+        syswrite WH, "ERR"; close WH;
+      } else {
+        &{$SIG{'ALRM'}} if ref($SIG{'ALRM'}) eq 'CODE';
+      }
+      if ($options->{'fg'} || $options->{'autokill'}) {
+        if (kill(0, $xvncServerPid)) {
+          &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
+        } else {
+          &cleanStale($options,$options->{'rfbport'},$options->{'displayNumber'},0);
+        }
+      }
+      exit 0 unless $options->{'fg'};
+      open(STDOUT, '>&', \*OLDOUT); # restore STDOUT
+      open(STDERR, '>&', \*OLDERR); # restore STDERR
+    }
+    # I am the parent
+    close WH;
+    my $status;
+    $status = 'ERR' unless defined sysread RH, $status, 3;
+    unless ($status eq 'OK') {
+      if (kill(0, $xvncServerPid)) {
+        &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
+      } else {
+        &cleanStale($options,$options->{'rfbport'},$options->{'displayNumber'},0);
+      }
+      my $header = "=================== tail $desktopLog ===================";
+      print STDERR "\n${header}\n";
+      while (my $line = <$desktopLogFh>) {
+        print STDERR $line;
+      }
+      print STDERR "\n".("=" x length $header)."\n\n";
+      print STDERR "Starting applications specified in $vncStartup has failed.\n";
+      print STDERR "Maybe try something simple first, e.g.,\n";
+      print STDERR "\ttigervncserver -xstartup /usr/bin/xterm\n";
+      return -1;
+    }
+  }
+  return 0;
+}
+
+1;
+__END__
+
+# -- documentation -----------------------------------------------------------
+
+=pod
+
+=back
+
+=head1 AUTHOR
+
+Joachim Falk E<lt>joachim.falk@gmx.deE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2004-2021 Joachim Falk <joachim.falk@gmx.de>
+
+Copyright (C) 2017 Philipp Wolski <philipp.wolski@kisters.de>
+
+Copyright (C) 2004 Ola Lundqvist <opal@debian.org>
+
+Copyright (C) 2004 Marcus Brinkmann <Marcus.Brinkmann@ruhr-uni-bochum.de>
+
+Copyright (C) 2004 Dirk Eddelbuettel <edd@debian.org>
+
+Copyright (C) 2002-2003 RealVNC Ltd.
+
+Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
+
+Copyright (C) 1997, 1998 Olivetti & Oracle Research Laboratory
+
+This is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+=cut

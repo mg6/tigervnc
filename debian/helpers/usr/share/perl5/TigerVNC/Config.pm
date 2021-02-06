@@ -1,0 +1,1200 @@
+package TigerVNC::Config;
+
+# Below is documentation for your module. You'd better edit it!
+=pod
+
+=head1 NAME
+
+TigerVNC::Config - Configuration reader
+
+=head1 SYNOPSIS
+
+  use TigerVNC::Config;
+
+  my $options = {};
+
+  TigerVNC::Config::readConfig($options, "defaults",
+    "/etc/tigervnc/vncserver-config-defaults");
+ 
+=head1 DESCRIPTION
+
+This package reads the configuration for the B<Xtigervnc> and B<X0tigervnc> servers.
+
+=cut
+
+use strict;
+use warnings;
+
+use File::Spec;
+use File::Basename qw(basename);
+
+use TigerVNC::OptionTie;
+use TigerVNC::Common;
+
+=pod
+
+=head1 EXPORTS
+
+=over
+
+=item OPT_PARAM
+
+=item OPT_CFGFILE
+
+=item OPT_TIGERVNCSERVER
+
+=item OPT_X0TIGERVNCSERVER
+
+=item OPT_XTIGERVNC
+
+=item OPT_X0TIGERVNC
+
+=item getOptionParseTable
+
+=item readConfigFile
+
+=item usage
+
+=item getConfig
+
+=back
+
+=cut
+
+use Exporter qw(import);
+
+# Items to export into callers namespace by default. Note: do not export
+# names by default without a very good reason. Use EXPORT_OK instead.
+# Do not simply export all your public functions/methods/constants.
+our @EXPORT = qw(
+  OPT_PARAM
+  OPT_CFGFILE
+  OPT_TIGERVNCSERVER
+  OPT_X0TIGERVNCSERVER
+  OPT_XTIGERVNC
+  OPT_X0TIGERVNC
+  getOptionParseTable
+  readConfigFile
+  usage
+  getConfig
+);
+
+our @EXPORT_OK = qw(
+);
+
+# This allows declaration
+#
+#   use UDNSC::ConfigParser ':all';
+#
+# If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
+# will save memory.
+our %EXPORT_TAGS = (
+# 'all' => \@EXPORT_OK,
+);
+
+our $VERSION = '1.11-1';
+
+#
+# Set global constants
+#
+
+=pod
+
+=head1 GLOBALS
+
+=over 4
+
+=item $SYSTEMCONFIGDIR
+
+The system configuration directory for TigerVNC, i.e., I</etc/tigervnc>.
+
+=cut
+
+our $SYSTEMCONFIGDIR = "/etc/tigervnc";
+
+=pod
+
+=back
+
+=head1 FUNCTIONS
+
+=cut
+
+###############################################################################
+#
+# getXDisplayDefaults uses xdpyinfo to find out the geometry, depth and pixel
+# format of the current X display being used.  If successful, it sets the
+# options as appropriate so that the X VNC server will use the same settings
+# (minus an allowance for window manager decorations on the geometry).  Using
+# the same depth and pixel format means that the VNC server won't have to
+# translate pixels when the desktop is being viewed on this X display (for
+# TrueColor displays anyway).
+#
+
+sub getXDisplayDefaults {
+  my ( $options ) = @_;
+
+  my (@lines, @matchlines, $defaultVisualId, $i);
+
+  return if !defined($ENV{DISPLAY}) &&
+            !defined($options->{'getDefaultFrom'});
+
+  my $xdpyinfo = &getCommand("xdpyinfo");
+  if (defined $ENV{DISPLAY}) {
+    @lines = `$xdpyinfo 2>/dev/null`;
+  } else {
+    @lines = `$xdpyinfo $options->{'getDefaultFrom'} 2>/dev/null`;
+  }
+
+  return if ($? != 0);
+
+  @matchlines = grep(/dimensions/, @lines);
+  if (@matchlines) {
+    my ($width, $height) = ($matchlines[0] =~ /(\d+)x(\d+) pixels/);
+    $options->{'geometry'} = "${width}x${height}";
+    $options->{'wmDecorationAdjustment'} = 1;
+  }
+
+  @matchlines = grep(/default visual id/, @lines);
+  if (@matchlines) {
+    ($defaultVisualId) = ($matchlines[0] =~ /id:\s+(\S+)/);
+
+    for ($i = 0; $i < @lines; $i++) {
+      if ($lines[$i] =~ /^\s*visual id:\s+$defaultVisualId$/) {
+        if (($lines[$i+1] !~ /TrueColor/) ||
+            ($lines[$i+2] !~ /depth/) ||
+            ($lines[$i+4] !~ /red, green, blue masks/)) {
+          return;
+        }
+        last;
+      }
+    }
+
+    return if ($i >= @lines);
+
+    ( $options->{'depth'} ) = ($lines[$i+2] =~ /depth:\s+(\d+)/);
+    my ($red,$green,$blue)
+        = ($lines[$i+4]
+           =~ /masks:\s+0x([0-9a-f]+), 0x([0-9a-f]+), 0x([0-9a-f]+)/);
+
+    $red = hex($red);
+    $green = hex($green);
+    $blue = hex($blue);
+
+    if ($red > $blue) {
+      $red = int(log($red) / log(2)) - int(log($green) / log(2));
+      $green = int(log($green) / log(2)) - int(log($blue) / log(2));
+      $blue = int(log($blue) / log(2)) + 1;
+      $options->{'pixelformat'} = "rgb$red$green$blue";
+    } else {
+      $blue = int(log($blue) / log(2)) - int(log($green) / log(2));
+      $green = int(log($green) / log(2)) - int(log($red) / log(2));
+      $red = int(log($red) / log(2)) + 1;
+      $options->{'pixelformat'} = "bgr$blue$green$red";
+    }
+  }
+}
+
+sub handleVNCStartupAuto {
+  my ($vncStartup, $options) = @_;
+
+  my $vncStartupAuto = $vncStartup;
+  if (-f File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session")) {
+    # A user provided Xtigervnc-session script exists => use it.
+    $vncStartupAuto =
+      File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session");
+  } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session")) {
+    # This is deprecated rename it to Xtigervnc-session.
+    if (rename
+        File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session")
+      , File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session")) {
+      symlink "Xtigervnc-session"
+        , File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session");
+      # A user provided Xtigervnc-session script exists => use it.
+      $vncStartupAuto =
+        File::Spec->catfile($options->{'vncUserDir'}, "Xtigervnc-session");
+    } else {
+      # A user provided Xtigervnc-session script exists => use it.
+      $vncStartupAuto =
+        File::Spec->catfile($options->{'vncUserDir'}, "Xvnc-session");
+    }
+  } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "xstartup")) {
+    # A user provided Xtigervnc-session script exists => use it.
+    $vncStartupAuto =
+      File::Spec->catfile($options->{'vncUserDir'}, "xstartup");
+  }
+  if (defined($options->{'vncStartup'}) && $options->{'vncStartup'} eq '__AUTO__') {
+    # vncStartup was not defined by the user configuration in ~/.vnc/vnc.conf.
+    $options->{'vncStartup'} = $vncStartupAuto;
+  }
+}
+
+sub OPT_PARAM()            { return 1;  }
+sub OPT_CFGFILE()          { return 2;  }
+sub OPT_TIGERVNCSERVER()   { return 4;  }
+sub OPT_X0TIGERVNCSERVER() { return 32; }
+sub OPT_XTIGERVNC()        { return 8;  }
+sub OPT_X0TIGERVNC()       { return 16; }
+
+sub getOptionParseTable($$) {
+  my ($options, $desc) = @_;
+
+  my $override = sub($) {
+    my ($name, $value) = @_;
+
+    if ($desc eq 'mandatory' && defined $options->{'src'}->{$name} &&
+        $value ne $options->{$name}) {
+      my $configFile = File::Spec->catfile($SYSTEMCONFIGDIR,
+        "vncserver-config-mandatory");
+      my $v;
+      if (!defined $value) {
+        $v = 'undef';
+      } elsif (ref($value) eq '') {
+        $v = '"'.$value.'"';
+      } elsif (ref($value) eq 'ARRAY') {
+        $v = '"'.join('", "', @{$value}).'"';
+      } else {
+        die 'Oops, '.ref($value).' values not supported!';
+      }
+      if ($options->{'src'}->{$name} eq 'defaults') {
+        print STDERR "$PROG: Warning: $configFile is overriding $name from defaults config to be $v!\n";
+      } elsif ($options->{'src'}->{$name} eq 'user') {
+        print STDERR "$PROG: Warning: $configFile is overriding $name form user config to be $v!\n";
+      } elsif ($options->{'src'}->{$name} eq 'cmdline') {
+        print STDERR "$PROG: Warning: $configFile is overriding $name from commandline to be $v!\n";
+      }
+    }
+    $options->{$name} = $value;
+    $options->{'src'}->{$name} = $desc;
+  };
+
+  # Flag field in $optionParseTable
+  # 1 => Case insensitive
+  # 2 => Config file parameter
+  # 4 => Command line option for tigervncserver
+  # 8 => Command line option for Xtigervnc
+
+  my @optionParseTable = (
+#     [ flag, 'name=type'      => store        ],
+      [ 4, 'name=s'            => 'desktopName' ],
+      [ 4, 'kill'              => 'kill' ],
+      [ 4, 'help|h|?'          => 'help' ],
+      [ 4, 'list'              => 'list' ],
+      [ 4, 'fg'                => 'fg' ],
+      [ 4, 'autokill'          => 'autokill' ],
+      [ 4, 'noxstartup'        => sub {
+          if (@_ == 2) {
+            &{$override}('vncStartup', undef);
+          } else {
+            return !defined $options->{'vncStartup'};
+          }
+        } ],
+      [ 4, 'xstartup:s'        => sub {
+          if (@_ == 2) {
+            if ($_[1] eq '') {
+              &{$override}('vncStartup', '__AUTO__');
+            } else {
+              &{$override}('vncStartup', $_[1]);
+            }
+          } else {
+            return $options->{'vncStartup'};
+          }
+        } ],
+      [ 4, 'xdisplaydefaults'  => sub {
+          if (@_ == 2) {
+            &getXDisplayDefaults($options);
+          } else {
+            return undef;
+          }
+        } ],
+      [ 6, 'wmDecoration=s'    => sub {
+          if (@_ == 2) {
+            if (defined $_[1]) {
+              my $wmDecoration = $_[1] // "undef";
+              unless ($_[1] =~ m/^(\d+)x(\d+)$/) {
+                die "Invalid wmDecoration $_[1]!";
+              }
+              $options->{'wmDecorationAdjustment'} = 1;
+            } else {
+              $options->{'wmDecorationAdjustment'} = undef;
+            }
+            &{$override}('wmDecoration', $_[1]);
+          } else {
+            return $options->{'wmDecoration'};
+          }
+        } ],
+      [ 4, 'useold'            => 'useold' ],
+      [ 4, 'cleanstale'        => 'cleanstale' ],
+      [ 4, 'clean'             => 'clean' ],
+      [ 4, 'verbose'           => 'verbose' ],
+      [ 4, 'dry-run'           => 'dry-run' ],
+      [ 4, 'passwd=s'          => 'vncPasswdFile' ],
+      [ 4, 'I-KNOW-THIS-IS-INSECURE' => 'I-KNOW-THIS-IS-INSECURE' ],
+      # Config file stuff
+      [ 2, 'session=s'         => sub {
+          if (@_ == 2) {
+            my $sn;
+            if (!defined($_[1]) || $_[1] eq '') {
+              $sn = [];
+            } elsif (ref($_[1]) eq 'ARRAY') {
+              $sn = $_[1];
+            } elsif (ref($_[1]) eq '') {
+              my $sessionCommand = undef;
+              $sn = [split(qr{\s+}, $_[1])];
+              $sessionCommand = loadXSession($_[1]) unless $_[1] =~ m{/};
+              my $found = 0;
+              if (defined $sessionCommand) {
+                $sn = [$sessionCommand];
+                $found = 1;
+              } elsif (@{$sn} > 0) {
+                foreach my $dir (split(/:/,$ENV{PATH})) {
+                  my $fqcmd = File::Spec->catfile($dir, $sn->[0]);
+                  if (-x $fqcmd) {
+                    $found = 1;
+                    $sn->[0] = $fqcmd;
+                    last;
+                  }
+                }
+              }
+              unless ($found) {
+                print STDERR "$PROG: Warning: No X session desktop file or command for $_[1]\n";
+              }
+            } else {
+              die "Option $_[0] must be set to a string or array reference!";
+            }
+            &{$override}('session', $sn);
+          } else {
+            return $options->{'session'};
+          }
+        } ],
+      [ 2, 'fontPath=s'        => 'fontPath' ],
+      [ 2, 'sslAutoGenCertCommand=s' => 'sslAutoGenCertCommand' ],
+      [ 2, 'vncUserDir=s'      => 'vncUserDir' ],
+      [ 2, 'vncPasswdFile=s'   => 'vncPasswdFile' ],
+      [ 2, 'vncStartup=s'      => 'vncStartup' ],
+      [ 2, 'xauthorityFile=s'  => 'xauthorityFile' ],
+      [ 2, 'desktopName=s'     => 'desktopName' ],
+      [ 2, 'getDefaultFrom=s'  => 'getDefaultFrom' ],
+      # Arguments from Xtigervnc (case sensitive)
+      [14, 'auth=s'            => 'xauthorityFile' ],
+      [14, 'fp=s'              => 'fontPath' ],
+      [14, 'geometry=s'        => sub {
+          if (@_ == 2) {
+            my $geometry = $_[1] // "undef";
+            unless ($geometry =~ /^(\d+)x(\d+)$/) {
+              die "Invalid geometry $_[1]!";
+            }
+            $options->{'wmDecorationAdjustment'} = undef;
+            &{$override}('geometry', $_[1]);
+          } else {
+            $options->{'geometry'} =~ m/^(\d+)x(\d+)$/;
+            my ($width, $height) = ($1, $2);
+            if ($options->{'wmDecorationAdjustment'}) {
+              $options->{'wmDecoration'} =~ /^(\d+)x(\d+)$/;
+              my ($wmDecorationWidth, $wmDecorationHeight) = ($1, $2);
+              $width  -= $wmDecorationWidth;
+              $height -= $wmDecorationHeight;
+            }
+            $width  = 4 if $width  < 4;
+            $height = 2 if $height < 2;
+            # Round up to multiples of 4, respectively, 2 for width and height.
+            $width  = int(($width +3)/4)*4;
+            $height = int(($height+1)/2)*2;
+            return "${width}x${height}";
+          }
+        } ],
+      [14, 'depth=i'           => sub {
+          if (@_ == 2) {
+            if (defined $_[1]) {
+              my $depth = int($_[1]);
+              if ($depth != 8 && $depth != 16 && $depth != 24 && $depth != 32) {
+                die "Invalid depth $depth must be one of 8, 16, 24, or 32!";
+              }
+              if (defined $options->{'pixelformat'}) {
+                $options->{'pixelformat'} =~ m/^(?:rgb|bgr)(\d)(\d)(\d)$/;
+                if ($depth < $1+$2+$3) {
+                  &{$override}('pixelformat', undef);
+                }
+              }
+            }
+            &{$override}('depth', $_[1]);
+          } else {
+            return $options->{'depth'};
+          }
+        } ],
+      [14, 'pixelformat=s'     => sub {
+          if (@_ == 2) {
+            if (defined $_[1]) {
+              unless ($_[1] =~ m/^(?:rgb|bgr)(\d)(\d)(\d)$/) {
+                die "Invalid pixelformat $_[1]!";
+              }
+              my $depth = $1+$2+$3;
+              if ($depth != 8 && $depth != 16 && $depth != 24 && $depth != 32) {
+                die "Invalid pixelformat $_[1]!";
+              }
+              if ($options->{'depth'} < $depth) {
+                &{$override}('depth', undef);
+              }
+            }
+            &{$override}('pixelformat', $_[1]);
+          } else {
+            return $options->{'pixelformat'};
+          }
+        } ],
+      # -inetd is not handled
+      [14, 'interface=s'       => sub {
+          if (@_ == 2) {
+            &{$override}('interface', $_[1]);
+            &{$override}('localhost', undef);
+          } else {
+            return $options->{'interface'};
+          }
+        } ],
+      # Parameters from Xtigervnc/X0tigervnc (case insensitive)
+      [17, 'display=s'         => sub {
+          if (@_ == 2) {
+            die "Invalid display $_[1]!" unless $_[1] =~ m/^:(\d+)$/;
+            &{$override}('displayNumber', $1);
+            &{$override}('displayHost', $HOSTFQDN);
+          } else {
+            return ':'.$options->{'displayNumber'};
+          }
+        } ],
+      [17, 'HostsFile=s'       => 'HostsFile' ],
+      [17, 'Geometry=s'        => 'Geometry' ],
+      [17, 'MaxProcessorUsage=i' => 'MaxProcessorUsage' ],
+      [17, 'PollingCycle=i'    => 'PollingCycle' ],
+      [17, 'UseSHM:b'          => 'UseSHM' ],
+      [15, 'desktop=s'         => 'desktopName' ],
+      [31, 'rfbport=i'         => 'rfbport' ],
+      [31, 'UseIPv4:b'         => 'UseIPv4' ],
+      [31, 'UseIPv6:b'         => 'UseIPv6' ],
+      [31, 'rfbunixpath=s'     => 'rfbunixpath' ],
+      [31, 'rfbunixmode=s'     => 'rfbunixmode' ],
+      [31, 'ClientWaitTimeMillis|rfbwait=i' => 'rfbwait' ],
+      [31, 'rfbauth|PasswordFile=s' => 'vncPasswdFile' ],
+      [31, 'AcceptCutText:b'   => 'AcceptCutText' ],
+      [31, 'MaxCutText=i'      => 'MaxCutText' ],
+      [31, 'SendCutText:b'     => 'SendCutText' ],
+      [15, 'SendPrimary:b'     => 'SendPrimary' ],
+      [31, 'AcceptPointerEvents:b' => 'AcceptPointerEvents' ],
+      [31, 'AcceptKeyEvents:b' => 'AcceptKeyEvents' ],
+      [31, 'AcceptSetDesktopSize:b' => 'AcceptSetDesktopSize' ],
+      [31, 'DisconnectClients:b' => 'DisconnectClients' ],
+      [31, 'NeverShared:b'     => sub {
+          if (@_ == 2) {
+            if ($_[1] eq '' || $_[1] eq '1') {
+              &{$override}('shared', 'never');
+            } elsif ($options->{'shared'} eq 'never') {
+              &{$override}('shared', undef);
+            }
+          } elsif (defined $options->{'shared'}) {
+            return $options->{'shared'} eq 'never';
+          } else {
+            return undef;
+          }
+        } ],
+      [31, 'AlwaysShared:b'    => sub {
+          if (@_ == 2) {
+            if ($_[1] eq '' || $_[1] eq '1') {
+              &{$override}('shared', 'always');
+            } elsif ($options->{'shared'} eq 'always') {
+              &{$override}('shared', undef);
+            }
+          } elsif (defined $options->{'shared'}) {
+            return $options->{'shared'} eq 'always';
+          } else {
+            return undef;
+          }
+        } ],
+      [31, 'Protocol3.3:b'     => 'Protocol3.3' ],
+      [31, 'FrameRate=i'       => 'FrameRate' ],
+      [31, 'CompareFB=s'       => 'CompareFB' ],
+      [31, 'ZlibLevel=i'       => 'ZlibLevel' ],
+      [31, 'ImprovedHextile:b' => 'ImprovedHextile' ],
+      [31, 'SecurityTypes=s'   => 'SecurityTypes' ],
+      [31, 'Password=s'        => 'Password' ],
+      [31, 'PlainUsers=s'      => 'PlainUsers' ],
+      [31, 'PAMService|pam_service=s' => 'PAMService' ],
+      [31, 'X509Cert=s'        => 'X509Cert' ],
+      [31, 'X509Key=s'         => 'X509Key'  ],
+      [31, 'GnuTLSPriority=s'  => 'GnuTLSPriority' ],
+      [31, 'UseBlacklist:b'    => 'UseBlacklist' ],
+      [31, 'BlacklistThreshold=i' => 'BlacklistThreshold' ],
+      [31, 'BlacklistTimeout=i' => 'BlacklistTimeout' ],
+      [31, 'IdleTimeout=i'     => 'IdleTimeout' ],
+      [31, 'MaxDisconnectionTime=i' => 'MaxDisconnectionTime' ],
+      [31, 'MaxConnectionTime=i' => 'MaxConnectionTime' ],
+      [31, 'MaxIdleTime=i'     => 'MaxIdleTime' ],
+      [31, 'QueryConnect:b'    => 'QueryConnect' ],
+      [31, 'QueryConnectTimeout=i' => 'QueryConnectTimeout' ],
+      [31, 'localhost:b'       => 'localhost' ],
+      [31, 'Log=s'             => 'Log' ],
+      [31, 'RemapKeys=s'       => 'RemapKeys' ],
+      [15, 'AvoidShiftNumLock:b' => 'AvoidShiftNumLock' ],
+      [31, 'RawKeyboard:b'     => 'RawKeyboard' ],
+      [15, 'AllowOverride=s'   => 'AllowOverride' ],
+    );
+
+  my $optionParseTable = [];
+  foreach my $optionParseEntry (@optionParseTable) {
+    my ($flags, $optname, $store) = @{$optionParseEntry};
+    if (@{$optionParseEntry} != 3 ||
+        (ref($store) ne '' && ref($store) ne 'CODE')) {
+#     print $#{$optionParseEntry}, "\n";
+#     print ref($optionParseEntry->[2]), "\n";
+      die "Oops, internal error: Wrong optioneParseEntry!";
+    }
+    my $valueVerifyer = undef;
+    if ($optname =~ m/:b$/) {
+      $valueVerifyer = sub {
+        if ($_[1] eq '' || $_[1] eq '1' || $_[1] eq 'yes' || $_[1] eq 'true') {
+          return 1;
+        } elsif ($_[1] eq '0' || $_[1] eq 'no' || $_[1] eq 'false') {
+          return 0;
+        } else {
+          die "Option $_[0] can only be set to true or false!";
+        }
+      }
+    } elsif ($optname =~ m/=i$/) {
+      $valueVerifyer = sub { $_[1] };
+    } elsif ($optname =~ m/[=:]s$/) {
+      $valueVerifyer = sub { $_[1] };
+    } elsif ($optname =~ m/[=:!+]/) {
+      die "Oops, internal error: Can't parse $optname format!";
+    } else {
+      $valueVerifyer = sub {
+        die "Option $_[0] can only be set to 1!" unless $_[1] eq 1;
+        $_[1]
+      };
+    }
+    if (ref($store) eq '') {
+      push @{$optionParseTable}, [
+          $flags,
+          $optname,
+          sub {
+            if (@_ == 2) {
+#             print STDERR $_[0], " <= ", $_[1]//"undef","\n";
+              &{$override}($store, &{$valueVerifyer}(@_));
+              return undef;
+            } else {
+              my $value = $options->{$store};
+#             print STDERR $_[0], " => ", $value//"undef","\n";
+              return $value;
+            }
+          }
+        ];
+    } else { # ref($store) eq 'CODE'
+      push @{$optionParseTable}, [
+          $flags,
+          $optname,
+          sub {
+            if (@_ == 2) {
+#             print STDERR $_[0], " <= ", $_[1]//"undef","\n";
+              &{$valueVerifyer}(@_);
+              &{$store}($_[0], &{$valueVerifyer}(@_));
+              return undef;
+            } else {
+              my $value = &{$store}(@_);
+#             print STDERR $_[0], " => ", $value//"undef","\n";
+              return $value;
+            }
+          }
+        ];
+    }
+  }
+
+  return $optionParseTable;
+}
+
+=pod
+
+=over
+
+=item readConfigFile
+
+This function reads the configuration file and stores it into the options hash.
+
+=cut
+
+sub readConfigFile($$) {
+  my ($options, $desc) = @_;
+  my ($configFile, $textConfig);
+
+  if ($desc eq 'mandatory') {
+    $configFile = File::Spec->catfile($SYSTEMCONFIGDIR,
+      "vncserver-config-mandatory");
+  } elsif ($desc eq 'defaults') {
+    $configFile = File::Spec->catfile($SYSTEMCONFIGDIR,
+      "vncserver-config-defaults");
+  } elsif ($desc eq 'user') {
+    if (-f File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf")) {
+      # User provided TigerVNC configuration found
+      $configFile = File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf");
+    } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf")) {
+      # This is deprecated rename it to tigervnc.conf
+      if (rename
+          File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf")
+        , File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf")) {
+        symlink "tigervnc.conf"
+          , File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf");
+        # User provided TigerVNC configuration found
+        $configFile = File::Spec->catfile($options->{'vncUserDir'}, "tigervnc.conf");
+      } else {
+        # User provided TigerVNC configuration found
+        $configFile = File::Spec->catfile($options->{'vncUserDir'}, "vnc.conf");
+      }
+    } elsif (-f File::Spec->catfile($options->{'vncUserDir'}, "config")) {
+      # User provided TigerVNC configuration found
+      $configFile = File::Spec->catfile($options->{'vncUserDir'}, "config");
+      $textConfig = 1;
+    }
+  } else {
+    die "Oops, $desc config file not known!";
+  }
+
+  return unless defined $configFile and -f $configFile;
+
+  if ($textConfig) {
+    my $configFileFh = IO::File->new($configFile, "r");
+
+    my %lowCase;
+
+    foreach my $optionParseEntry (@{&getOptionParseTable($options, $desc)}) {
+      my ($flags, $optname, $store) = @{$optionParseEntry};
+      next unless $flags & &OPT_CFGFILE;
+
+      $optname =~ m/^([^:=]*)/;
+      $optname = $1;
+
+      foreach my $name (split(/\|/, $optname)) {
+        $lowCase{lc($name)} = sub { &{$store}($name, @_) };
+      }
+    }
+    while (my $line = <$configFileFh>) {
+      chomp $line; $line =~ s/#.*$//;
+      next if $line =~ /^\s*$/;
+      if ($line =~ /^\s*(\w+)\s*=\s*(.*)$/) {
+        my ($k, $v) = ($1, $2);
+        chomp $v;
+        if (defined $lowCase{lc($k)}) {
+          &{$lowCase{lc($k)}}($v);
+        } else {
+          $options->{'vncServerExtraArgs'} = [grep {
+              $_->{'name'} ne $k
+            } @{$options->{'vncServerExtraArgs'}}];
+          push @{$options->{'vncServerExtraArgs'}}, {
+              name => $k,
+              src  => $desc,
+              args => [ "-$k", $v ]
+            };
+        }
+      } elsif ($line =~ m/^\s*(\w+)\s*$/) {
+        my ($k) = ($1);
+        if (defined $lowCase{lc($k)}) {
+          &{$lowCase{lc($k)}}(1);
+        } else {
+          $options->{'vncServerExtraArgs'} = [grep {
+              $_->{'name'} ne $k
+            } @{$options->{'vncServerExtraArgs'}}];
+          push @{$options->{'vncServerExtraArgs'}}, {
+              name => $k,
+              src  => $desc,
+              args => [ "-$k" ]
+            };
+        }
+      } else {
+        print STDERR "$PROG: Warning: Can't parse '$line' from config file $configFile!\n";
+      }
+    }
+    $configFileFh->close();
+  } else {
+    # Clean config package before loading new config
+    foreach my $key (keys %{config::}) {
+      delete ${config::}{$key};
+    }
+
+    $config::wrapperMode = $options->{'wrapperMode'};
+
+    my %tiedNoCase;
+
+    foreach my $optionParseEntry (@{&getOptionParseTable($options, $desc)}) {
+      my ($flags, $optname, $store) = @{$optionParseEntry};
+      next unless $flags & &OPT_CFGFILE;
+
+      $optname =~ m/^([^:=]*)/;
+      $optname = $1;
+
+  #   print STDERR "==> $optname <==\n";
+      foreach my $name (split(/\|/, $optname)) {
+        $name =~ s{[^a-zA-Z0-9_]}{_}g;
+  #     print STDERR $name, "\n";
+        no strict 'refs';
+        tie ${"config::$name"}, 'TigerVNC::OptionTie', sub { &{$store}($name, @_) };
+        $tiedNoCase{lc($name)} = $name;
+      }
+    }
+
+  # print STDERR "readConfigFile $desc $configFile\n";
+
+    $@ = undef;
+    {
+      package config;
+      do $configFile;
+    }
+    if ($@) {
+      print STDERR "$PROG: Error parsing config file $configFile: $@";
+      exit -1;
+    }
+
+    foreach my $key (keys %{config::}) {
+      next if $key eq 'wrapperMode';
+      if (my $name = $tiedNoCase{lc($key)}) {
+        next if $name eq $key;
+        print STDERR "$PROG: Warning: $key option must be $name in config file $configFile!\n";
+        next;
+      }
+      my $value = ${${config::}{$key}};
+      $options->{'vncServerExtraArgs'} = [grep {
+          $_->{'name'} ne $key
+        } @{$options->{'vncServerExtraArgs'}}];
+      if (defined $value) {
+        push @{$options->{'vncServerExtraArgs'}}, {
+            name => $key,
+            src  => $desc,
+            args => [ "-$key", $value ]
+          };
+      }
+    }
+  }
+}
+
+#
+# Load a session desktop file
+#
+sub loadXSession {
+  my ($name) = @_;
+  my ($file, $found_group, %session);
+
+  $file = "/usr/share/xsessions/$name.desktop";
+
+  if (!-f $file) {
+    return;
+  }
+
+  my $fh;
+  if (!open($fh, $file)) {
+    warn "Could not open session desktop file $file: $!";
+    return;
+  }
+
+  $found_group = 0;
+  while (my $line = <$fh>) {
+    next if $line =~ /^#/;
+    next if $line =~ /^\s*$/;
+
+    chomp $line;
+
+    if (!$found_group) {
+      next if $line ne "[Desktop Entry]";
+      $found_group = 1;
+      next;
+    } else {
+      last if $line =~ /^\[/;
+    }
+
+    my ($key, $value) = $line =~ /^\s*([]A-Za-z0-9_@\-\[]+)\s*=\s*(.*)$/;
+    if (!$key) {
+      warn "Invalid session desktop file $file";
+      close($fh);
+      return;
+    }
+
+    $value =~ s/\\s/ /g;
+    $value =~ s/\\n/\n/g;
+    $value =~ s/\\t/\t/g;
+    $value =~ s/\\r/\r/g;
+    $value =~ s/\\\\/\\/g;
+
+    $session{$key} = $value;
+#   print STDERR "$key => $value\n";
+  }
+
+  close($fh);
+
+  unless (defined $session{'Exec'}) {
+    warn "Invalid session desktop file $file does not contain a command to start the session!";
+    close($fh);
+    return;
+  }
+
+  return $session{'Exec'};
+}
+
+sub parseCmdLine {
+  my ($options) = @_;
+  my $rc = 1;
+
+  my (%options, %parameters, $sessionStore);
+  foreach my $optionParseEntry (@{&getOptionParseTable($options, "cmdline")}) {
+    my ($flags, $optname, $store) = @{$optionParseEntry};
+    my $opttype;
+    if ($optname =~ m/^(.*)([:=][bis])$/) {
+      $optname = $1;
+      $opttype = $2;
+    } else {
+      $opttype = '';
+    }
+    if ($optname eq 'session') {
+      $sessionStore = $store;
+    }
+    next unless $flags & &OPT_TIGERVNCSERVER;
+    foreach my $name (split(/\|/, $optname)) {
+      if ($flags & &OPT_PARAM) {
+        $parameters{lc($name)} = [ $name.$opttype, $store ];
+      } else {
+        $options{$name} = [ $name.$opttype, $store ];
+      }
+    }
+  }
+  # Seperate session args
+  if (defined $sessionStore) {
+    my @newargv;
+    my $ref = \@newargv;
+    my $sn  = [];
+
+    foreach my $entry (@ARGV) {
+      if ($entry eq '--') {
+        $ref = $sn;
+      } else {
+        push @$ref, $entry;
+      }
+    }
+    if ($ref eq $sn) {
+      $sn = $sn->[0] if @{$sn} == 1;
+      unless (eval { &{$sessionStore}('session', $sn); 1 }) {
+        my $errorText = $@;
+        $errorText =~ s/ at .* line \d+\.$//;
+        chomp $errorText;
+        print STDERR "$PROG: Invalid session: $errorText\n\n";
+        $rc = 0;
+      }
+    }
+    @ARGV = @newargv;
+  }
+  # Command line parsing
+  {
+    my $pendingExtraArg = undef;
+    while (@ARGV) {
+      my $arg = shift @ARGV;
+      my $opt = undef;
+      my $par = undef;
+      my $val = undef;
+
+      if ($arg =~ /^((?:[^-:@=.0-9][\w.-]+@)?(?:\d+\.\d+\.\d+\.\d+|\[[0-9a-fA-F:.]+\]|[^-:@=.0-9][^=:@]*))?(?::(\d+(?:\.\d+)?|\*))?$/) {
+#       print STDERR "==> $arg <==\n";
+        my ($host, $nr) = ($1, $2);
+        $host =~ s{\[([0-9a-fA-F:.]+)\]$}{$1} if defined $host;
+        $nr   =~ s{\.\d+$}{}                  if defined $nr;
+        if (!defined $host) {
+          $options->{'displayHost'} = $HOSTFQDN;
+        } elsif ($host eq "localhost") {
+          $options->{'localhost'}   = 'yes';
+          $options->{'displayHost'} = $HOSTFQDN;
+        } else {
+          $options->{'displayHost'} = $host;
+        }
+        if (defined $nr) {
+          $options->{'displayNumber'} = $nr;
+        }
+        undef $pendingExtraArg;
+        next;
+      } elsif ($arg =~ m/^(-([a-zA-Z]))=(.*)$/) {
+        $arg = $1;
+        $opt = $2;
+        $val = $3;
+      } elsif ($arg =~ m/^-([a-zA-Z])$/) {
+        $opt = $1;
+      } elsif ($arg =~ m/^(--?([a-zA-Z][^=]+))=(.*)$/) {
+        $arg = $1;
+        $opt = $par = $2;
+        $val = $3;
+      } elsif ($arg =~ m/^--?([a-zA-Z][^=]+)$/) {
+        $opt = $par = $1;
+      } elsif ($arg =~ m/^([a-zA-Z][^=]+)=(.*)$/) {
+        $par = $1;
+        $val = $2;
+      } elsif (defined $pendingExtraArg) {
+        push @{$pendingExtraArg->{'args'}}, $arg;
+        undef $pendingExtraArg;
+        next;
+      } else {
+        $rc = 0;
+        print STDERR "$PROG: Option $arg: Unrecognized!\n\n";
+        last;
+      }
+      my $optInfo = $parameters{lc($par)} // $options{$opt//'undef'};
+      $opt = $par;
+      if (defined $optInfo) {
+        if ($optInfo->[0] =~ m/=/) {
+          $val = shift @ARGV unless defined $val;
+          unless (defined $val) {
+            $rc = 0;
+            print STDERR "$PROG: Option $arg: Missing option value!\n\n";
+            last;
+          }
+        } elsif ($optInfo->[0] =~ m/:b$/) {
+          if (@ARGV || !defined $val) {
+            $val = shift @ARGV;
+            unless ($val =~ m/^(0|1|no|yes|false|true)$/) {
+              unshift @ARGV, $val;
+              undef $val;
+            }
+          }
+        } elsif ($optInfo->[0] =~ m/:s$/) {
+          if (@ARGV || !defined $val) {
+            $val = shift @ARGV;
+            if ($val =~ m/^-/) {
+              unshift @ARGV, $val;
+              undef $val;
+            }
+          }
+        } else {
+          if (defined $val) {
+            $rc = 0;
+            print STDERR "$PROG: Option $arg: Does not take an option value!\n\n";
+            last;
+          }
+          $val = 1;
+        }
+        unless (eval { &{$optInfo->[1]}($opt, $val//""); 1 }) {
+          my $errorText = $@;
+          $errorText =~ s/ at .* line \d+\.$//;
+          chomp $errorText;
+          print STDERR "$PROG: Option $arg: $errorText\n\n";
+          $rc = 0;
+          last;
+        }
+        undef $pendingExtraArg;
+      } else {
+        $options->{'vncServerExtraArgs'} = [grep {
+            $_->{'name'} ne $opt
+          } @{$options->{'vncServerExtraArgs'}}];
+        $pendingExtraArg = {
+            name => $opt,
+            src  => 'cmdline',
+            args => [ $arg ]
+          };
+        push @{$options->{'vncServerExtraArgs'}}, $pendingExtraArg;
+        undef $pendingExtraArg if defined $val;
+      }
+    }
+  }
+  return $rc;
+}
+
+=pod
+
+=item usage
+
+Dump command line help to STDOUT or STDERR.
+
+=cut
+
+sub usage {
+  my ($options) = @_;
+
+  my $prefix = " " x length("  $PROG ");
+  my $msg = "usage:\n".
+    "  $PROG -help|-h|-?            This help message. Further help in tigervncserver(1).\n\n".
+
+    "  $PROG [:<number>]            X11 display for VNC server\n".
+    $prefix."[-dry-run]             Take no real action\n".
+    $prefix."[-verbose]             Be more verbose\n".
+    $prefix."[-useold]              Only start VNC server if not already running\n".
+    $prefix."[-name <desktop-name>] VNC desktop name\n".
+    $prefix."[-depth <depth>]       Desktop bit depth (8|16|24|32)\n".
+    $prefix."[-pixelformat          X11 server pixel format\n".
+    $prefix."  rgb888|rgb565|rgb332   blue color channel encoded in lower bits\n".
+    $prefix." |bgr888|bgr565|bgr233]  red color channel encoded in lower bits\n".
+    $prefix."[-geometry <dim>]      Desktop geometry in <width>x<height>\n".
+    $prefix."[-xdisplaydefaults]    Get geometry and pixelformat from running X\n".
+    $prefix."[-wmDecoration <dim>]  Shrink geometry from xdisplaydefaults by dim\n".
+    $prefix."[-localhost yes|no]    Only accept VNC connections from localhost\n".
+    $prefix."[-rfbport port]        TCP port to listen for RFB protocol\n".
+    $prefix."[-fg]                  No daemonization and\n".
+    $prefix."                       kill the VNC server after its X session has terminated\n".
+    $prefix."[-autokill]            Kill the VNC server after its X session has terminated\n".
+    $prefix."[-noxstartup]          Do not run the Xtigervnc-session script\n".
+    $prefix."[-xstartup]            Specify the script to start after launching Xtigervnc\n".
+    $prefix."[-fp fontpath]         Colon separated list of font locations\n".
+    $prefix."[-cleanstale]          Do not choke on a stale lockfile\n".
+    $prefix."[-SecurityTypes]       Comma list of security types to offer (None, VncAuth,\n".
+    $prefix."                       Plain, TLSNone, TLSVnc, TLSPlain, X509None, X509Vnc,\n".
+    $prefix."                       X509Plain). On default, offer only VncAuth.\n".
+    $prefix."[-PlainUsers]          In case of security types Plain, TLSPlain, and X509Plain,\n".
+    $prefix."                       this options specifies the list of authorized users.\n".
+    $prefix."[-PAMService]          In case of security types Plain, TLSPlain, and X509Plain,\n".
+    $prefix."                       this options specifies the service name for PAM password\n".
+    $prefix."                       validation (default vnc if present otherwise tigervnc).\n".
+    $prefix."[-PasswordFile]        Password file for security types VncAuth, TLSVnc, and X509Vnc.\n".
+    $prefix."                       The default password file is ~/.vnc/passwd\n".
+    $prefix."[-passwd]              Alias for PasswordFile\n".
+    $prefix."[-rfbauth]             Alias for PasswordFile\n".
+    $prefix."[-X509Key]             Path to the key of the X509 certificate in PEM format. This\n".
+    $prefix."                       is used by the security types X509None, X509Vnc, and X509Plain.\n".
+    $prefix."[-X509Cert]            Path to the X509 certificate in PEM format. This is used by\n".
+    $prefix."                       the security types X509None, X509Vnc, and X509Plain.\n".
+    $prefix."<X11-options ...>      Further options for Xtigervnc(1)\n".
+    $prefix."[-- sessiontype]       Specify which X session desktop should be started\n\n".
+
+    "  $PROG -kill                  Kill a VNC server\n".
+    $prefix."[:<number>|:*]         VNC server to kill, * for all\n".
+    $prefix."[-dry-run]             Take no real action\n".
+    $prefix."[-verbose]             Be more verbose\n".
+    $prefix."[-clean]               Also clean log files of VNC session\n\n".
+
+    "  $PROG -list                  List VNC server sessions\n".
+    $prefix."[:<number>|:*]         VNC server to list, * for all\n".
+    $prefix."[-cleanstale]          Do not list stale VNC server sessions\n\n";
+
+  if ($options->{'usageError'}) {
+    print STDERR $msg;
+  } else {
+    print STDOUT $msg;
+  }
+}
+
+=pod
+
+=item getConfig
+
+This function parses the system I</etc/tigervnc/vncserver-config-defaults> and the user I<~/.vnc/tigervnc.conf> configuration file as well as processes the command line to return an options hash.
+
+=cut
+
+sub getConfig {
+  my $opts;
+  if (@_ == 1 && ref($_[0]) eq 'HASH') {
+    $opts= $_[0];
+  } else {
+    $opts= { @_ };
+  }
+
+  #
+  # Global options. You may want to configure some of these for your site.
+  # Use /etc/tigervnc/vncserver-config-defaults and ~/.vnc/tigervnc.conf for
+  # this purpose.
+  #
+  my %options = (
+# Values that are documented in /etc/tigervnc/vncserver-config-*
+## Values declared as system values in /etc/tigervnc/vncserver-config-*
+      fontPath                  => undef,
+      PAMService                =>
+        undef, # Use vnc if /etc/pam.d/vnc exists. Otherwise,
+               # use our own /etc/pam.d/tigervnc as fallback.
+      sslAutoGenCertCommand     =>
+        "openssl req -newkey ec:$SYSTEMCONFIGDIR/ecparams.pem -x509 -days 2190 -nodes",
+## Values declared as user values in /etc/tigervnc/vncserver-config-*, i.e.,
+## values that are intended to be overwritten by ~/.vnc/tigervnc.conf.
+      vncUserDir                =>
+        File::Spec->catfile($ENV{HOME}, ".vnc"),
+      vncPasswdFile             =>
+        undef, # later derived from vncUserDir
+      vncStartup                =>
+        "/etc/X11/Xtigervnc-session",
+      xauthorityFile            =>
+        $ENV{XAUTHORITY} ||
+        File::Spec->catfile($ENV{HOME}, ".Xauthority"),
+      desktopName               => undef,
+      wmDecoration              =>
+        "8x64", # a guess at the typical size for a window manager decoration
+      geometry                  => "1280x1024",
+      depth                     => 24,
+      pixelformat               => undef,
+      getDefaultFrom            => undef,
+      rfbwait                   => 30000,
+      rfbport                   => undef,
+      localhost                 => undef,
+      SecurityTypes             =>
+        undef, # later derived depening on localhost setting
+      PlainUsers                =>
+        undef, # later derived from /usr/bin/id -u -n
+      X509Cert                  =>
+        undef, # auto generated if absent and stored in
+               # ~/.vnc/${HOSTFQDN}-SrvCert.pem
+      X509Key                   =>
+        undef, # auto generated if absent and stored in
+               # ~/.vnc/${HOSTFQDN}-SrvKey.pem
+      session                   => undef,
+# Undocumented values
+      vncServerExtraArgs        => [],
+      cleanstale                => 0,
+      clean                     => 0,
+      displayNumber             => undef,
+      displayHost               => undef,
+      src                       => {},
+    );
+
+  foreach my $key (keys %options) {
+    $opts->{$key} = $options{$key} unless defined $opts->{$key};
+  }
+
+  #
+  # Then source in configuration files, first the site wide one and then the
+  # user specific one.
+  #
+  &readConfigFile($opts, "defaults");
+
+  if (!(-d $opts->{'vncUserDir'})) {
+    # Create the user's vnc directory if necessary.
+    if (-e $opts->{'vncUserDir'}) {
+      print STDERR "$PROG: Could not create $opts->{'vncUserDir'}, file exists but is not a directory.\n";
+      exit 1;
+    }
+    if (!mkpath ($opts->{'vncUserDir'}, 0, 0755)) {
+      print STDERR "$PROG: Could not create $opts->{'vncUserDir'}.\n";
+      exit 1;
+    }
+  }
+  my $vncStartup = $opts->{'vncStartup'};
+  $opts->{'vncStartup'} = '__AUTO__' if defined $vncStartup;
+
+  &readConfigFile($opts, "user");
+
+  $opts->{'usageError'} = !&parseCmdLine($opts);
+
+  &handleVNCStartupAuto($vncStartup, $opts);
+
+  if (defined $opts->{'displayHost'}) {
+    if (!$opts->{'kill'} && !$opts->{'list'}) {
+      $opts->{'usageError'} = 1 if ($opts->{'displayNumber'}||"") eq '*';
+    }
+  }
+
+  return $opts;
+}
+
+1;
+__END__
+
+# -- documentation -----------------------------------------------------------
+
+=pod
+
+=back
+
+=head1 AUTHOR
+
+Joachim Falk E<lt>joachim.falk@gmx.deE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2021 by Joachim Falk
+
+This is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+=cut

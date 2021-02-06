@@ -132,10 +132,12 @@ Description: Virtual network computing; Common software needed by servers
 Package: tigervnc-scraping-server
 Architecture: any
 Depends:
+ libfile-readbackwards-perl (>= 1.05),
+ netbase,
+ tigervnc-common,
  ${shlibs:Depends},
  ${misc:Depends},
-Recommends:
- tigervnc-common
+ ${perl:Depends}
 Provides:
  vnc-server
 Replaces: tigervnc-server (<< 1.1.90)
@@ -163,11 +165,11 @@ Depends:
  xauth,
  libfile-readbackwards-perl (>= 1.05),
  netbase,
+ tigervnc-common,
  ${shlibs:Depends},
  ${misc:Depends},
  ${perl:Depends}
 Recommends:
- tigervnc-common,
  libgl1-mesa-dri (>= 7.1~rc1),
  xfonts-base,
  x11-xserver-utils

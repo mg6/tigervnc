@@ -1,3 +1,7 @@
 usr/bin/tigervncconfig usr/bin
 usr/bin/tigervncpasswd usr/bin
+usr/share/perl5/TigerVNC/Common.pm     usr/share/perl5/TigerVNC
+usr/share/perl5/TigerVNC/Config.pm     usr/share/perl5/TigerVNC
+usr/share/perl5/TigerVNC/OptionTie.pm  usr/share/perl5/TigerVNC
+usr/share/perl5/TigerVNC/Wrapper.pm    usr/share/perl5/TigerVNC
 etc/pam.d/tigervnc etc/pam.d

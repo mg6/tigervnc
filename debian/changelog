@@ -1,4 +1,4 @@
-tigervnc (1.11.0+dfsg-1~RC7) UNRELEASED; urgency=medium
+tigervnc (1.11.0+dfsg-1~RC9) UNRELEASED; urgency=medium
 
   [ Joachim Falk ]
   * Fresh upstream TigerVNC 1.11.0 (Closes: #976002).
