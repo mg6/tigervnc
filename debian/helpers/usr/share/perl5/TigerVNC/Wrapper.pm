@@ -15,7 +15,7 @@ TigerVNC::Wrapper - TigerVNC server management
   my $options = { wrapperMode => 'tigervncserver' };
 
   # First, we ensure that we're operating in a sane environment.
-  &sanityCheck($options);
+  exit 1 unless &sanityCheck($options);
 
   # Next, parses the system /etc/tigervnc/vncserver-config-defaults and the user
   # ~/.vnc/tigervnc.conf configuration file as well as processes the command line.
@@ -240,10 +240,12 @@ sub desktopLog {
     "${HOSTFQDN}:${rfbport}.log");
 }
 
-sub cleanStale($$$$) {
-  my ($options, $nr, $usedDisplay, $stale) = @_;
-  my $pidFile  = &pidFile($options,$nr);
-  my @X11Locks = ("/tmp/.X$usedDisplay-lock", "/tmp/.X11-unix/X$usedDisplay");
+sub cleanStale($$$) {
+  my ($options, $runningVncServers, $nr) = @_;
+  my $usedDisplay = $runningVncServers->{$nr}->{'usedDisplay'};
+  my $stale       = $runningVncServers->{$nr}->{'stale'};
+  my $server      = $runningVncServers->{$nr}->{'server'};
+  my $pidFile     = &pidFile($options,$nr);
 
   # vnc pidfile stale
   my $msg = "";
@@ -254,8 +256,9 @@ sub cleanStale($$$$) {
       print "Cleaning stale pidfile '$pidFile'!\n";
     }
   }
-  if ($options->{'wrapperMode'} eq 'tigervncserver') {
+  if ($server eq 'Xtigervnc') {
     if (!$stale || !&checkTCPPortUsed(6000 + $usedDisplay)) {
+      my @X11Locks = ("/tmp/.X$usedDisplay-lock", "/tmp/.X11-unix/X$usedDisplay");
       foreach my $entry (grep { -e $_ } @X11Locks) {
         unless ($options->{'dry-run'} || unlink($entry) || $! == &ENOENT) {
           print STDERR "$PROG: Warning: Can't clean stale X11 lock '$entry': $!\n";
@@ -331,12 +334,8 @@ sub runningVncServers {
         # Example client connection
         $client = "xtigervncviewer $HOSTFQDN:$rfbport";
       }
-      if ($options->{'cleanstale'} && $stale) {
-        &cleanStale($options, $nr, $usedDisplay, 1);
-        next;
-      }
-      # running vnc if !$options->{'cleanstale'}
-      $runningVncServers{$nr} = {
+      $stale = 1 if $stale || !&checkTCPPortUsed($rfbport);
+      my $vncServerEntry = {
           'name'        => $name,
           'server'      => $server,
           'client'      => $client,
@@ -346,6 +345,13 @@ sub runningVncServers {
           'rfbport'     => $rfbport,
           'stale'       => $stale,
         };
+
+      if ($options->{'cleanstale'} && $stale) {
+        &cleanStale($options, { $nr => $vncServerEntry }, $nr);
+        next;
+      }
+      # running VNC server if $options->{'cleanstale'}
+      $runningVncServers{$nr} = $vncServerEntry;
     }
     undef $d;
   }
@@ -466,7 +472,7 @@ sub killVncServers {
 
   $SIG{'CHLD'} = 'IGNORE';
   foreach my $vnc (@{$vncs}) {
-    my $stale       = 0;
+    my $stale       = \$runningVncServers->{$vnc}->{'stale'};
     my $pid         = $runningVncServers->{$vnc}->{'pid'};
     my $usedDisplay = $runningVncServers->{$vnc}->{'usedDisplay'};
 
@@ -491,14 +497,14 @@ sub killVncServers {
         }
       } elsif ($! == &ESRCH) {
         print " which was already dead\n";
-        $stale = 1;
+        $$stale = 1;
       } else {
         $retval = 1;
         print STDERR "\nCan't kill '$pid': $!\n";
         next;
       }
     }
-    &cleanStale($options, $vnc, $usedDisplay, $stale);
+    &cleanStale($options, $runningVncServers, $vnc);
 
     # If option -clean is given, also remove the logfile
     if (!$options->{'dry-run'} && $options->{'clean'}) {
@@ -755,17 +761,21 @@ sub startVncServer {
   }
   if ($options->{'wrapperMode'} eq 'tigervncserver') {
     my $dn = $options->{'displayNumber'};
-    my @vncs = grep {
-      $runningVncServers->{$_}->{'usedDisplay'} eq $dn }
-      keys %{$runningVncServers};
-    foreach my $vnc (@vncs) {
-      next unless $runningVncServers->{$vnc}->{'stale'};
-      &cleanStale($options,$vnc,$dn,1);
+    my @vncs = ();
+    foreach my $vnc (keys %{$runningVncServers}) {
+      next unless $runningVncServers->{$vnc}->{'usedDisplay'} eq $dn;
+      next unless $runningVncServers->{$vnc}->{'server'} eq 'Xtigervnc';
+      if ($runningVncServers->{$vnc}->{'stale'}) {
+        &cleanStale($options, $runningVncServers, $vnc);
+      } else {
+        push @vncs, $vnc;
+      }
     }
-    @vncs = grep {
-      !$runningVncServers->{$_}->{'stale'} } @vncs;
-    if (@vncs > 0 || !&checkDisplayNumberAvailable($dn)) {
-      print STDERR "A X11 server is already running as :$dn on machine $HOSTFQDN\n";
+    if (@vncs > 0) {
+      print STDERR "A Xtigervnc server is already running for display :$dn on machine $HOSTFQDN.\n";
+      return 1;
+    } elsif (!&checkDisplayNumberAvailable($dn)) {
+      print STDERR "A X11 server is already running for display :$dn on machine $HOSTFQDN.\n";
       return 1;
     }
   }
@@ -777,11 +787,11 @@ sub startVncServer {
       } keys %{$runningVncServers};
     if ($rfbport >= 5900 && $rfbport <= 5999) {
       $rfbport -= 5900;
-      print STDERR "A VNC server is already running as :$rfbport on machine $HOSTFQDN\n";
+      print STDERR "A VNC server is already running as :$rfbport on machine $HOSTFQDN.\n";
     } elsif (@vncs > 0) {
-      print STDERR "A VNC server is already listening at port $rfbport on machine $HOSTFQDN\n";
+      print STDERR "A VNC server is already listening at port $rfbport on machine $HOSTFQDN.\n";
     } else {
-      print STDERR "Something else is already listening at port $rfbport on machine $HOSTFQDN\n";
+      print STDERR "Something else is already listening at port $rfbport on machine $HOSTFQDN.\n";
     }
     return 1;
   }
@@ -858,6 +868,9 @@ sub startVncServer {
     $runningVncServers = {
         $options->{'rfbport'} => {
             'name'        => "$HOSTFQDN:".$options->{'displayNumber'},
+            'server'      => $options->{'wrapperMode'} eq 'tigervncserver'
+                               ? "Xtigervnc" : "X0tigervnc",
+            'stale'       => 0,
             'pid'         => $xvncServerPid,
             'rfbport'     => $options->{'rfbport'},
             'usedDisplay' => $options->{'displayNumber'},
@@ -884,7 +897,7 @@ sub startVncServer {
         if (kill(0, $xvncServerPid)) {
           &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
         } else {
-          &cleanStale($options,$options->{'rfbport'},$options->{'displayNumber'},0);
+          &cleanStale($options, $runningVncServers, $options->{'rfbport'});
         }
         my $header = "=================== tail $desktopLog ===================";
         print STDERR "\n${header}\n";
@@ -998,7 +1011,7 @@ sub startVncServer {
         if (kill(0, $xvncServerPid)) {
           &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
         } else {
-          &cleanStale($options,$options->{'rfbport'},$options->{'displayNumber'},0);
+          &cleanStale($options, $runningVncServers, $options->{'rfbport'});
         }
       }
       exit 0 unless $options->{'fg'};
@@ -1013,7 +1026,7 @@ sub startVncServer {
       if (kill(0, $xvncServerPid)) {
         &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
       } else {
-        &cleanStale($options,$options->{'rfbport'},$options->{'displayNumber'},0);
+        &cleanStale($options, $runningVncServers, $options->{'rfbport'});
       }
       my $header = "=================== tail $desktopLog ===================";
       print STDERR "\n${header}\n";

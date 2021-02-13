@@ -33,7 +33,8 @@ sub main {
   #
   # First, we ensure that we're operating in a sane environment.
   #
-  &sanityCheck($options);
+  exit 1 unless &sanityCheck($options);
+
   #
   # Next, parses the system /etc/tigervnc/vncserver-config-defaults and the user
   # ~/.vnc/tigervnc.conf configuration file as well as processes the command line.

@@ -17,7 +17,7 @@ TigerVNC::Common - Common infrastructure
   #
   # First, we ensure that we're operating in a sane environment.
   #
-  &sanityCheck($options);
+  exit 1 unless &sanityCheck($options);
 
   my $xdpyinfo = &getCommand("xdpyinfo");
 
@@ -47,6 +47,10 @@ use File::Basename qw(dirname basename);
 
 =item $USER
 
+=item $ROWS
+
+=item $COLUMNS
+
 =item $SYSTEMCONFIGDIR
 
 =item &sanityCheck
@@ -66,6 +70,7 @@ our @EXPORT = qw(
   $PROG
   $HOST $HOSTFQDN
   $USER
+  $ROWS $COLUMNS
   $SYSTEMCONFIGDIR
   sanityCheck
   getCommand
@@ -156,7 +161,7 @@ if (defined $CMDS{'hostname'}) {
 
 =item $USER
 
-The user name of the user using this package, i.e., the result of B<`id -u -n`>.
+The user name of the uid using this package, e.g., the result of B<`id -u -n`>.
 
 =cut
 
@@ -167,6 +172,29 @@ our $USER;
   $USER = getpwuid($<);
   undef $USER if $USER eq "";
 }
+
+=pod
+
+=item $ROWS and $COLUMNS
+
+The number of rows and columns of the terminal if a terminal is present.
+
+=cut
+
+our $ROWS = undef;
+our $COLUMNS = 80;
+
+eval {
+  require 'sys/ioctl.ph';
+  die "no TIOCGWINSZ" unless defined &TIOCGWINSZ;
+  open(TTY, "+</dev/tty") or die "No tty: $!";
+  my $winsize='';
+  unless (ioctl(TTY, &TIOCGWINSZ, $winsize)) {
+    die sprintf "$0: ioctl TIOCGWINSZ (%08x: $!)\n", &TIOCGWINSZ;
+  }
+  close TTY;
+  ($ROWS, $COLUMNS) = unpack('S2', $winsize);
+};
 
 =pod
 
@@ -189,7 +217,6 @@ our $SYSTEMCONFIGDIR = "/etc/tigervnc";
 sub installPackageError {
   my ($package) = @_;
   print STDERR "\tPlease install the $package package, i.e., sudo apt-get install $package.\n";
-  exit 1;
 }
 
 =pod
@@ -199,6 +226,8 @@ sub installPackageError {
 =item sanityCheck
 
 Routine to make sure we're operating in a sane environment.
+Returns 1 if we run in a sane environment, 0 otherwise.
+
 
 =cut 
 
@@ -219,27 +248,28 @@ sub sanityCheck {
   # Check the HOME environment variable is set
   #
   unless (defined $ENV{HOME}) {
-    print STDERR "$PROG: The HOME environment variable is not set.\n";
-    exit 1;
+    print STDERR "$PROG: The HOME environment variable must be set.\n";
+    return 0;
   }
   #
   # Check that we have a host name and also a fully qualified one.
   #
   unless (defined $HOST) {
     print STDERR "$PROG: Could not acquire host name of this machine.\n";
-    exit 1;
+    return 0;
   }
   unless (defined $HOSTFQDN) {
     print STDERR "$PROG: Could not acquire fully qualified host name of this machine.\n";
-    exit 1;
+    return 0;
   }
   #
   # Check that we have a user name.
   #
   unless (defined $USER) {
     print STDERR "$PROG: I do not know who you are.\n";
-    exit 1;
+    return 0;
   }
+  return 1;
 }
 
 =pod
