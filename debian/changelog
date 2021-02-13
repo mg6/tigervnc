@@ -1,4 +1,4 @@
-tigervnc (1.11.0+dfsg-1~RC9) UNRELEASED; urgency=medium
+tigervnc (1.11.0+dfsg-1) unstable; urgency=medium
 
   [ Joachim Falk ]
   * Fresh upstream TigerVNC 1.11.0 (Closes: #976002).
@@ -9,7 +9,7 @@ tigervnc (1.11.0+dfsg-1~RC9) UNRELEASED; urgency=medium
   * Remove obsolete field Name from debian/upstream/metadata (already present in
     machine-readable debian/copyright).
 
- -- Joachim Falk <joachim.falk@gmx.de>  Wed, 13 Jan 2021 20:31:22 +0100
+ -- Joachim Falk <joachim.falk@gmx.de>  Sat, 13 Feb 2021 20:41:10 +0100
 
 tigervnc (1.10.1+dfsg-9) unstable; urgency=medium
 
