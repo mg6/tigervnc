@@ -21,8 +21,14 @@ fi
 dpkg-maintscript-helper mv_conffile \
   /etc/X11/Xvnc-session /etc/X11/Xtigervnc-session \
   1.10.1+dfsg-9 tigervnc-standalone-server -- "$@"
-dpkg-maintscript-helper mv_conffile \
-  /etc/vnc.conf /etc/tigervnc/vncserver-config-defaults \
+dpkg-maintscript-helper rm_conffile \
+  /etc/vnc.conf \
+  1.10.1+dfsg-9 tigervnc-standalone-server -- "$@"
+dpkg-maintscript-helper rm_conffile \
+  /etc/tigervnc/ecparams.pem \
+  1.10.1+dfsg-9 tigervnc-standalone-server -- "$@"
+dpkg-maintscript-helper rm_conffile \
+  /etc/tigervnc/ssleay.cnf \
   1.10.1+dfsg-9 tigervnc-standalone-server -- "$@"
 
 #DEBHELPER#

@@ -1,7 +1,8 @@
 # /etc/tigervnc/vncserver-config-defaults written by Joachim Falk. This file is
 # in the Public Domain.
 #
-# This is a configuration file for the tigervnc-standalone-server package.
+# This is a configuration file for the tigervnc-standalone-server and the
+# tigervnc-scraping-server packages.
 #
 # After this file, $ENV{HOME}/.vnc/tigervnc.conf will be sourced, so values can
 # be overwritten on a per-user basis.
@@ -68,14 +69,14 @@
 
 # $sslAutoGenCertCommand is used to auto generate the certificate
 # for the X509Cert and X509Key options. The configuration for
-# openssl is taken from /etc/tigervnc/ssleay.cnf where we substitute
+# openssl is taken from /etc/tigervnc/openssl.cnf where we substitute
 # @HostName@ by the fully qualified domain name of the host.
 #
 # Example: $sslAutoGenCertCommand =
 #  "openssl req -newkey rsa:4096 -x509 -days 365 -nodes";
 #
 # Default: $sslAutoGenCertCommand =
-#  "openssl req -newkey ec:/etc/tigervnc/ecparams.pem -x509 -days 2190 -nodes";
+#  "openssl req -newkey ec:/etc/tigervnc/openssl-ecparams.pem -x509 -days 2190 -nodes";
 
 # User configuration
 # ------------------

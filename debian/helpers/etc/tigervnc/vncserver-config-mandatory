@@ -1,9 +1,11 @@
 # /etc/tigervnc/vncserver-config-mandatory written by Joachim Falk. This file is
 # in the Public Domain.
 #
-# This is a configuration file for the tigervnc-standalone-server package. The
-# options specified in this file override any of the same options defined in
-# vncserver-config-defaults, a user's tigervnc.conf file, as well as options
+# This is a configuration file for the tigervnc-standalone-server and the
+# tigervnc-scraping-server packages.
+#
+# The options specified in this file override any of the same options defined
+# in vncserver-config-defaults, a user's tigervnc.conf file, as well as options
 # given via the command line. This file offers a mechanism to establish some
 # basic form of system-wide policy.
 #

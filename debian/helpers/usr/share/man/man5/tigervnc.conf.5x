@@ -2,14 +2,14 @@
 .\" ** The above line should force tbl to be a preprocessor **
 .\" Man page for tigervnc.conf
 .\"
-.\" Copyright (C) 2006 - 2020 Joachim.Falk@gmx.de
+.\" Copyright (C) 2006 - 2021 Joachim.Falk@gmx.de
 .\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
 .\"
 .\" You may distribute under the terms of the GNU General Public
 .\" License as specified in the file COPYING that comes with the
 .\" Debian GNU/Linux distribution.
 .\"
-.TH tigervnc.conf 5x "Jan 13th, 2021" "TigerVNC 1.11.0" "Virtual Network Computing"
+.TH tigervnc.conf 5x "Feb 15th, 2021" "TigerVNC 1.11.0" "Virtual Network Computing"
 .SH NAME
 tigervnc.conf \- configuration files for Virtual Network Computing
 .SH SYNOPSIS
@@ -92,7 +92,7 @@ If
 is not present, then
 .BR tigervncserver (1)
 expects to use the\fB tigervnc\fP PAM service to authenticate the passwords of users when any of the\fB *Plain\fP security types are used.
-Note that the tigervnc-common package provides the PAM service configuration file
+Note that the tigervnc-common-server package provides the PAM service configuration file
 .IR /etc/pam.d/tigervnc .
 Otherwise, if
 .I /etc/pam.d/vnc
@@ -100,7 +100,7 @@ is present, then the\fB vnc\fP PAM service will be used.
 .PP
 .IR $sslAutoGenCertCommand\ \| =\ " openssl\ req
 .RS 15
-.I \-newkey\ ec:/etc/tigervnc/ecparams.pem
+.I \-newkey\ ec:/etc/tigervnc/openssl-ecparams.pem
 .RE
 .RS 15
 .IR \-x509\ \-days\ 2190\ \-nodes """;
@@ -111,7 +111,7 @@ The command specified by the\fI $sslAutoGenCertCommand\fP parameter is used to a
 The configuration for
 .BR openssl (1SSL)
 is taken from
-.I /etc/tigervnc/ssleay.cnf
+.I /etc/tigervnc/openssl.cnf
 where we substitute\fB @HostName@\fP by the fully qualified domain name of the host.
 .RE
 .TP
@@ -290,6 +290,7 @@ The real server. Will be invoked by tigervncserver.
 .BR tigervncsession (8),
 .BR x0tigervncserver (1),
 .BR Xtigervnc (1),
+.BR X0tigervnc (1),
 .BR xtigervncviewer (1)
 .
 .SH AUTHOR

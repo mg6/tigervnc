@@ -236,10 +236,9 @@ sub sanityCheck {
   #
   # Check we have all the commands we'll need on the path.
   #
-  foreach my $cmd (qw(hostname xauth)) {
-    getCommand($cmd);
-  }
+  getCommand('hostname');
   if (($options->{'wrapperMode'}//"undef") eq 'tigervncserver') {
+    getCommand('xauth');
     getCommand('Xtigervnc');
   } elsif (($options->{'wrapperMode'}//"undef") eq 'x0tigervncserver') {
     getCommand('X0tigervnc');

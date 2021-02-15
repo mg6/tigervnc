@@ -600,8 +600,8 @@ sub CreateX509Cert {
       exit 1;
     }
     my $configSSLFh;
-    unless (defined open($configSSLFh, "<", "$SYSTEMCONFIGDIR/ssleay.cnf")) {
-      print STDERR "Can't open openssl configuration template $SYSTEMCONFIGDIR/ssleay.cnf: $!\n";
+    unless (defined open($configSSLFh, "<", "$SYSTEMCONFIGDIR/openssl.cnf")) {
+      print STDERR "Can't open openssl configuration template $SYSTEMCONFIGDIR/openssl.cnf: $!\n";
       exit 1;
     }
     while (my $line = <$configSSLFh>) {
@@ -689,7 +689,7 @@ sub startVncServer {
       ! -f '/etc/pam.d/tigervnc') {
     print STDERR "$PROG: The tigervnc PAM servcice required for the security types\n";
     print STDERR "\tPlain, TLSPlain, or X509Plain is not installed.\n";
-    &installPackageError("tigervnc-common");
+    &installPackageError("tigervnc-common-server");
   }
 
   unless (defined $options->{'localhost'}) {
@@ -804,7 +804,7 @@ sub startVncServer {
   &CreateVNCPasswd($options);
   # Make sure the user has a x509 certificate if required.
   &CreateX509Cert($options);
-  &CreateMITCookie($options);
+  &CreateMITCookie($options) if $options->{'wrapperMode'} eq 'tigervncserver';
 
   my $pidFileFh  = IO::File->new($pidFile, "w", 0644);
   unless (defined $pidFileFh) {

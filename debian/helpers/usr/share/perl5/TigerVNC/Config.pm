@@ -1312,7 +1312,7 @@ sub getConfig {
         undef, # Use vnc if /etc/pam.d/vnc exists. Otherwise,
                # use our own /etc/pam.d/tigervnc as fallback.
       sslAutoGenCertCommand     =>
-        "openssl req -newkey ec:$SYSTEMCONFIGDIR/ecparams.pem -x509 -days 2190 -nodes",
+        "openssl req -newkey ec:$SYSTEMCONFIGDIR/openssl-ecparams.pem -x509 -days 2190 -nodes",
 ## Values declared as user values in /etc/tigervnc/vncserver-config-*, i.e.,
 ## values that are intended to be overwritten by ~/.vnc/tigervnc.conf.
       vncUserDir                =>

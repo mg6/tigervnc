@@ -129,15 +129,33 @@ Description: Virtual network computing; Common software needed by servers
  It is implemented in a client/server model. This package provides the
  vncpasswd and vncconfig tools.
 
+Package: tigervnc-common-server
+Architecture: any
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ ${perl:Depends},
+ libfile-readbackwards-perl (>= 1.05),
+ netbase,
+Description: Virtual network computing; Common software needed by servers
+ VNC stands for Virtual Network Computing. It is, in essence, a remote
+ display system which allows you to view a computing `desktop' environment
+ not only on the machine where it is running, but from anywhere on the
+ Internet and from a wide variety of machine architectures.
+ .
+ It is implemented in a client/server model. This package provides common
+ infrastructure for tigervnc-scraping-server and tigervnc-standalone-server
+ packages.
+
 Package: tigervnc-scraping-server
 Architecture: any
 Depends:
- libfile-readbackwards-perl (>= 1.05),
- netbase,
- tigervnc-common,
+ tigervnc-common-server (= ${source:Version}),
  ${shlibs:Depends},
  ${misc:Depends},
  ${perl:Depends}
+Recommends:
+ tigervnc-common (= ${source:Version})
 Provides:
  vnc-server
 Replaces: tigervnc-server (<< 1.1.90)
@@ -163,13 +181,12 @@ Depends:
  xkb-data,
  x11-xkb-utils,
  xauth,
- libfile-readbackwards-perl (>= 1.05),
- netbase,
- tigervnc-common,
+ tigervnc-common-server (= ${source:Version}),
  ${shlibs:Depends},
  ${misc:Depends},
  ${perl:Depends}
 Recommends:
+ tigervnc-common (= ${source:Version}),
  libgl1-mesa-dri (>= 7.1~rc1),
  xfonts-base,
  x11-xserver-utils
@@ -201,7 +218,7 @@ Depends:
  ${shlibs:Depends},
  ${misc:Depends},
 Recommends:
- tigervnc-common
+ tigervnc-common (= ${source:Version})
 Provides:
  vnc-server,
  vnc-xorg-extension
@@ -222,7 +239,7 @@ Depends:
  ${shlibs:Depends},
  ${misc:Depends},
 Suggests:
- tigervnc-common
+ tigervnc-common (= ${source:Version})
 Provides:
  vncviewer,
  vnc-viewer
