@@ -1076,6 +1076,30 @@ sub parseCmdLine {
   return $rc;
 }
 
+sub lineBreakText($$) {
+  my ($fh, $indent, $text) = @_;
+
+  foreach my $block (split /\n/, $text) {
+    my $line = undef;
+    foreach my $word (split /\s+/, $block) {
+      if (!defined $line) {
+        $line = $indent . $word;
+        $indent = " "x length($indent);
+      } elsif (length($line)+length($word)+1 <= $COLUMNS) {
+        $line .= " " . $word;
+      } else {
+        print $fh $line, "\n";
+        $line = $indent . $word;
+      }
+    }
+    if (defined $line) {
+      print $fh $line, "\n";
+    } else {
+      print $fh $indent, "\n";
+    }
+  }
+}
+
 =pod
 
 =item usage
@@ -1092,8 +1116,6 @@ sub usage {
 
   my $activeFlag = $options->{'wrapperMode'} eq 'tigervncserver'
     ? &OPT_TIGERVNCSERVER : &OPT_X0TIGERVNCSERVER;
-
-  my $optLen = 0;
 
   foreach my $optionParseEntry (@{&getOptionParseTable($options, "cmdline")}) {
     my ($flags, $optname, $store, $help) = @{$optionParseEntry};
@@ -1124,7 +1146,6 @@ sub usage {
       my $opt = $defname =~ m/^(?:kill|list|help)$/
         ? " -$name$optval"
         : "[-$name$optval]";
-      $optLen = length($opt) if $optLen < length($opt);
 
       if ($name eq $defname) {
         push @{$opts{$defname}}, {
@@ -1142,35 +1163,29 @@ sub usage {
     }
   }
 
-  $optLen += 1;
-
   my $fh = \*STDOUT;
   $fh = \*STDERR if $options->{'usageError'};
 
-  my $usageOptionDumping = sub {
-    foreach my $opt (@_) {
-      foreach my $entry (@{$opts{$opt}}) {
-        my $help = $entry->{'help'};
-        unless (defined $help) {
-          if ($options->{'wrapperMode'} eq 'tigervncserver') {
-            if ($entry->{'flags'} & &OPT_XTIGERVNC) {
-              $help = "is an Xtigervnc option. For details, see Xtigervnc(1)."
-            }
-          } else {
-            if ($entry->{'flags'} & &OPT_X0TIGERVNC) {
-              $help = "is an X0tigervnc option. For details, see X0tigervnc(1)."
-            }
-          }
-        }
-        printf $fh "    %-${optLen}s %s\n", $entry->{'opt'}, $help;
-      }
-    }
-  };
-
   {
-    my @optsNoHelp = grep { !defined $opts{$_}->[0]->{'help'} } @opts;
-    my @optsHelp   = grep {  defined $opts{$_}->[0]->{'help'} } @opts;
-    @opts = (@optsHelp, sort { lc($a) cmp lc($b) } @optsNoHelp);
+#   my @optsNoHelp = grep { !defined $opts{$_}->[0]->{'help'} } @opts;
+#   my @optsHelp   = grep {  defined $opts{$_}->[0]->{'help'} } @opts;
+#   @opts = (@optsHelp, sort { lc($a) cmp lc($b) } @optsNoHelp);
+    @opts = grep { defined $opts{$_}->[0]->{'help'} } @opts;
+    if ($options->{'wrapperMode'} eq 'tigervncserver') {
+      $opts{'Xtigervnc'} = [
+          { opt   => '[Xtigervnc options...]',
+            flags => &OPT_XTIGERVNC | &OPT_TIGERVNCSERVER,
+            help  => 'For details, see Xtigervnc(1).' }
+        ];
+      push @opts, 'Xtigervnc';
+    } else {
+      $opts{'X0tigervnc'} = [
+          { opt   => '[X0tigervnc options...]',
+            flags => &OPT_X0TIGERVNC | &OPT_X0TIGERVNCSERVER,
+            help  => 'For details, see X0tigervnc(1).' }
+        ];
+      push @opts, 'X0tigervnc';
+    }
   }
   if (defined $opts{'display'}) {
     $opts{'display'} = [
@@ -1191,9 +1206,44 @@ sub usage {
     @opts = ((grep { $_ ne 'session' } @opts), 'session');
   }
 
-  print $fh "$PROG usage:\n";
+  my $optLen = 0;
+  foreach my $opt (@opts) {
+    foreach my $entry (@{$opts{$opt}}) {
+      my $opt = $entry->{'opt'};
+      $optLen = length($opt) if $optLen < length($opt);
+    }
+  }
+  $optLen += 1;
+
+  my $usageOptionDumping = sub {
+    foreach my $opt (@_) {
+      foreach my $entry (@{$opts{$opt}}) {
+        my $help = $entry->{'help'};
+#       unless (defined $help) {
+#         if ($options->{'wrapperMode'} eq 'tigervncserver') {
+#           if ($entry->{'flags'} & &OPT_XTIGERVNC) {
+#             $help = "is an Xtigervnc option. For details, see Xtigervnc(1)."
+#           }
+#         } else {
+#           if ($entry->{'flags'} & &OPT_X0TIGERVNC) {
+#             $help = "is an X0tigervnc option. For details, see X0tigervnc(1)."
+#           }
+#         }
+#       }
+        if ($COLUMNS > 40 + 4 + ${optLen}) {
+          my $indent = sprintf "    %-${optLen}s", $entry->{'opt'};
+          &lineBreakText($fh, $indent, $help);
+        } else {
+          printf $fh "    %-${optLen}s\n", $entry->{'opt'};
+          &lineBreakText($fh, "      ", $help);
+        }
+      }
+    }
+  };
+
+  print $fh "$PROG usage:\n\n";
   {
-    print $fh "\n  Help can be found in $PROG(1), or via usage of\n";
+    &lineBreakText($fh, "  ", "Help can be found in $PROG(1), or via usage of");
     &{$usageOptionDumping}(qw(help));
   }
   {
@@ -1201,80 +1251,25 @@ sub usage {
         !($_ =~ m/^(?:help|kill|clean|list|cleanstale|I-KNOW-THIS-IS-INSECURE)$/)
       } @opts;
     if ($options->{'wrapperMode'} eq 'tigervncserver') {
-      print $fh "\n  To start a VNC server use $PROG [options] [-- session]\n";
+      &lineBreakText($fh, "  ", "\nTo start a VNC server use $PROG [options] [-- session]");
     } else {
-      print $fh "\n  To start a VNC server use $PROG [options]\n";
+      &lineBreakText($fh, "  ", "\nTo start a VNC server use $PROG [options]");
     }
     &{$usageOptionDumping}(@dumpOpts);
   }
   {
-    print $fh "\n  To list all active VNC servers of the user use $PROG\n";
+    &lineBreakText($fh, "  ", "\nTo list all active VNC servers of the user use $PROG");
     &{$usageOptionDumping}(qw(list display rfbport));
   }
   {
-    print $fh "\n  To kill a VNC server use $PROG\n";
+    &lineBreakText($fh, "  ", "\nTo kill a VNC server use $PROG");
     &{$usageOptionDumping}(qw(kill display rfbport dry-run verbose clean));
   }
   if ($options->{'wrapperMode'} eq 'tigervncserver') {
-    print $fh "\n\n  For further help, consult the $PROG(1) and Xtigervnc(1) manual pages.\n";
+    &lineBreakText($fh, "  ", "\n\nFor further help, consult the $PROG(1) and Xtigervnc(1) manual pages.");
   } else {
-    print $fh "\n\n  For further help, consult the $PROG(1) and X0tigervnc(1) manual pages.\n";
+    &lineBreakText($fh, "  ", "\n\nFor further help, consult the $PROG(1) and X0tigervnc(1) manual pages.");
   }
-# my $prefix = " " x length("  $PROG ");
-# my $msg = "usage:\n".
-#   "  $PROG -help|-h|-?            This help message. Further help in tigervncserver(1).\n\n".
-
-#   "  $PROG [:<number>]            X11 display for VNC server\n".
-#   $prefix."[-dry-run]             Take no real action\n".
-#   $prefix."[-verbose]             Be more verbose\n".
-#   $prefix."[-useold]              Only start VNC server if not already running\n".
-#   $prefix."[-name <desktop-name>] VNC desktop name\n".
-#   $prefix."[-depth <depth>]       Desktop bit depth (8|16|24|32)\n".
-#   $prefix."[-pixelformat          X11 server pixel format\n".
-#   $prefix."  rgb888|rgb565|rgb332   blue color channel encoded in lower bits\n".
-#   $prefix." |bgr888|bgr565|bgr233]  red color channel encoded in lower bits\n".
-#   $prefix."[-geometry <dim>]      Desktop geometry in <width>x<height>\n".
-#   $prefix."[-xdisplaydefaults]    Get geometry and pixelformat from running X\n".
-#   $prefix."[-wmDecoration <dim>]  Shrink geometry from xdisplaydefaults by dim\n".
-#   $prefix."[-localhost yes|no]    Only accept VNC connections from localhost\n".
-#   $prefix."[-rfbport port]        TCP port to listen for RFB protocol\n".
-#   $prefix."[-fg]                  No daemonization and\n".
-#   $prefix."                       kill the VNC server after its X session has terminated\n".
-#   $prefix."[-autokill]            Kill the VNC server after its X session has terminated\n".
-#   $prefix."[-noxstartup]          Do not run the Xtigervnc-session script\n".
-#   $prefix."[-xstartup]            Specify the script to start after launching Xtigervnc\n".
-#   $prefix."[-fp fontpath]         Colon separated list of font locations\n".
-#   $prefix."[-cleanstale]          Do not choke on a stale lockfile\n".
-#   $prefix."[-SecurityTypes]       Comma list of security types to offer (None, VncAuth,\n".
-#   $prefix."                       Plain, TLSNone, TLSVnc, TLSPlain, X509None, X509Vnc,\n".
-#   $prefix."                       X509Plain). On default, offer only VncAuth.\n".
-#   $prefix."[-PlainUsers]          In case of security types Plain, TLSPlain, and X509Plain,\n".
-#   $prefix."                       this options specifies the list of authorized users.\n".
-#   $prefix."[-PAMService]          In case of security types Plain, TLSPlain, and X509Plain,\n".
-#   $prefix."                       this options specifies the service name for PAM password\n".
-#   $prefix."                       validation (default vnc if present otherwise tigervnc).\n".
-#   $prefix."[-PasswordFile]        Password file for security types VncAuth, TLSVnc, and X509Vnc.\n".
-#   $prefix."                       The default password file is ~/.vnc/passwd\n".
-#   $prefix."[-passwd]              Alias for PasswordFile\n".
-#   $prefix."[-rfbauth]             Alias for PasswordFile\n".
-#   $prefix."[-X509Key]             Path to the key of the X509 certificate in PEM format. This\n".
-#   $prefix."                       is used by the security types X509None, X509Vnc, and X509Plain.\n".
-#   $prefix."[-X509Cert]            Path to the X509 certificate in PEM format. This is used by\n".
-#   $prefix."                       the security types X509None, X509Vnc, and X509Plain.\n".
-#   $prefix."<X11-options ...>      Further options for Xtigervnc(1)\n".
-#   $prefix."[-- sessiontype]       Specify which X session desktop should be started\n\n".
-
-#   "  $PROG -kill                  Kill a VNC server\n".
-#   $prefix."[:<number>|:*]         VNC server to kill, * for all\n".
-#   $prefix."[-dry-run]             Take no real action\n".
-#   $prefix."[-verbose]             Be more verbose\n".
-#   $prefix."[-clean]               Also clean log files of VNC session\n\n".
-
-#   "  $PROG -list                  List VNC server sessions\n".
-#   $prefix."[:<number>|:*]         VNC server to list, * for all\n".
-#   $prefix."[-cleanstale]          Do not list stale VNC server sessions\n\n";
-
-# print $fh $msg;
 }
 
 =pod
