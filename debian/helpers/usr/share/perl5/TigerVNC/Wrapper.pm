@@ -40,9 +40,7 @@ This module starts either a B<Xtigervnc> or B<X0tigervnc> server.
 use strict;
 use warnings;
 
-use File::Path;
 use File::Spec;
-use File::Basename qw(dirname basename);
 use File::ReadBackwards;
 use DirHandle;
 use File::stat;
@@ -98,26 +96,23 @@ our %EXPORT_TAGS = (
 
 our $VERSION = '1.11-1';
 
-##
-## Set global constants
-##
 #
+# Set global constants
+#
+
 #=pod
 #
 #=head1 GLOBALS
 #
 #=over 4
 #
-#=item $PROG
+#=item $MAGIC
 #
-#The program using this package.
+#Magic prefix inside the logfile to identify currently running server information.
 #
 #=back
 #
 #=cut
-#
-## Get the program name
-#our $PROG = basename($0);
 
 our $MAGIC = '3NI3X0 ';
 

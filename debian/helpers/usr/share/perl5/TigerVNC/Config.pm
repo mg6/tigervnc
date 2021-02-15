@@ -27,7 +27,7 @@ use strict;
 use warnings;
 
 use File::Spec;
-use File::Basename qw(basename);
+use File::Path qw(mkpath);
 
 use TigerVNC::OptionTie;
 use TigerVNC::Common;
