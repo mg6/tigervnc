@@ -469,10 +469,11 @@ sub killVncServers {
   foreach my $vnc (@{$vncs}) {
     my $stale       = \$runningVncServers->{$vnc}->{'stale'};
     my $pid         = $runningVncServers->{$vnc}->{'pid'};
+    my $server      = $runningVncServers->{$vnc}->{'server'};
     my $usedDisplay = $runningVncServers->{$vnc}->{'usedDisplay'};
 
     next unless defined $pid;
-    print "Killing Xtigervnc process ID $pid...";
+    print "Killing $server process ID $pid...";
     unless ($options->{'dry-run'}) {
       if (kill('TERM', $pid)) {
         my $i = 10;
