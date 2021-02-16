@@ -1259,7 +1259,7 @@ sub usage {
   }
   {
     &lineBreakText($fh, "  ", "\nTo list all active VNC servers of the user use $PROG");
-    &{$usageOptionDumping}(qw(list display rfbport));
+    &{$usageOptionDumping}(qw(list display rfbport cleanstale));
   }
   {
     &lineBreakText($fh, "  ", "\nTo kill a VNC server use $PROG");
