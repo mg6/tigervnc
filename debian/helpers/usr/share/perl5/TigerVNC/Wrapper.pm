@@ -802,11 +802,17 @@ sub startVncServer {
   my $pidFileFh  = IO::File->new($pidFile, "w", 0644);
   unless (defined $pidFileFh) {
     print STDERR "$PROG: Can't create pid file '$pidFile': $!\n";
+    unlink($pidFile);
     return 1;
   }
+  unlink($pidFile) if $options->{'dry-run'};
 
   my $desktopLogFh = IO::File->new($desktopLog, "a+");
-  seek($desktopLogFh, 0, SEEK_END);
+  unless (defined $desktopLogFh && seek($desktopLogFh, 0, SEEK_END)) {
+    print STDERR "$PROG: Can't open log file '$desktopLog' for append: $!\n";
+    unlink($pidFile);
+    return 1;
+  }
 
   my $xvncServerPid = undef;
   {
@@ -838,9 +844,10 @@ sub startVncServer {
 #   push @cmd, '-pn';
     push @cmd, map { @{$_->{'args'}} } @{$options->{'vncServerExtraArgs'}};
 
-    print join(" ",@cmd), "\n" if $options->{'verbose'};
-
-    my $xvncServerPid = fork();
+    if ($options->{'verbose'} || $options->{'dry-run'}) {
+      print "Starting ",join(" ",@cmd), "\n";
+    }
+    $xvncServerPid = fork();
     die "Failed to fork: $!" if $xvncServerPid < 0;
 
     if ($xvncServerPid == 0) {
@@ -851,6 +858,7 @@ sub startVncServer {
       open(STDERR, '>>', $desktopLog);
       STDERR->autoflush(1);
       STDOUT->autoflush(1);
+      exit 0 if $options->{'dry-run'};
       exec {$cmd[0]} (@cmd) or
         print OLDERR "$PROG: Can't exec '".$cmd[0]."': $!\n";
       exit 1;
@@ -870,7 +878,7 @@ sub startVncServer {
           }
       };
     # Wait for Xtigervnc to start up
-    {
+    unless ($options->{'dry-run'}) {
       my $i = 300;
       for (; $i >= 0; $i = $i-1) {
         last if &checkTCPPortUsed($options->{'rfbport'});
@@ -985,6 +993,7 @@ sub startVncServer {
       # our parent if not in -fg mode.
       alarm 3 unless $options->{'fg'};
       $! = 0;
+      @cmd = qw(sleep 6) if $options->{'dry-run'};
       if (system {$cmd[0]} (@cmd)) {
         if ($!) {
           alarm 0; # this must not be before the if ($!) condition
