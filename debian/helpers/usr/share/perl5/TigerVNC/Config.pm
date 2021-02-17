@@ -1024,7 +1024,7 @@ sub parseCmdLine {
             last;
           }
         } elsif ($optInfo->[0] =~ m/:b$/) {
-          if (@ARGV || !defined $val) {
+          if (@ARGV && !defined $val) {
             $val = shift @ARGV;
             unless ($val =~ m/^(0|1|no|yes|false|true)$/) {
               unshift @ARGV, $val;
@@ -1032,7 +1032,7 @@ sub parseCmdLine {
             }
           }
         } elsif ($optInfo->[0] =~ m/:s$/) {
-          if (@ARGV || !defined $val) {
+          if (@ARGV && !defined $val) {
             $val = shift @ARGV;
             if ($val =~ m/^-/) {
               unshift @ARGV, $val;
