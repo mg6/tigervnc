@@ -296,6 +296,20 @@ sub getOptionParseTable($$) {
 
   my @optionParseTable = (
 #     [ flag, 'name=type'      => store        ],
+      # Options for -help mode
+      [36, 'help|h|?'          => 'help',
+       "if specified, dumps this help message." ],
+      # Options for -kill mode
+      [36, 'kill'              => 'kill',
+       "if provided, kill the specified VNC server of the user." ],
+      [36, 'clean'             => 'clean',
+       "if specified, the log files of the terminated VNC session will also be removed." ],
+      # Options for -list mode
+      [36, 'list'              => 'list',
+       "if provided, all active VNC servers of the user are listed." ],
+      [36, 'cleanstale'        => 'cleanstale',
+       "if provided, clean up pid and lockfiles of stale VNC server instances of the user." ],
+      # Options for both tigervncserver and x0tigervncserver
       [53, 'display=s'         => sub {
           if (@_ == 2) {
             die "Invalid display $_[1]!" unless $_[1] =~ m/^:(\d+)$/;
@@ -306,14 +320,98 @@ sub getOptionParseTable($$) {
           }
         },
        "specifies the X11 display to be used." ],
-      [36, 'kill'              => 'kill',
-       "if provided, kill the specified VNC server of the user." ],
-      [36, 'help|h|?'          => 'help',
-       "This help message." ],
-      [36, 'list'              => 'list',
-       "if provided, all active VNC servers of the user are listed." ],
+      [63, 'rfbport=i'         => 'rfbport',
+       "provides the TCP port to be used for the RFB protocol." ],
+      [63, 'localhost:b'       => 'localhost',
+       "if enabled, VNC will only accept connections from localhost." ],
+      [63, 'SecurityTypes=s'   => 'SecurityTypes',
+       "specifies a comma list of security types to offer (None, VncAuth, Plain, TLSNone, TLSVnc, TLSPlain, X509None, X509Vnc, X509Plain). On default, offer only VncAuth." ],
+      [63, 'PasswordFile|rfbauth=s' => 'vncPasswdFile',
+       "specifies the password file for security types VncAuth, TLSVnc, and X509Vnc. On default, ~/.vnc/passwd is used." ],
+      # Backward compatible command line option
+      [36, 'passwd=s'          => 'vncPasswdFile',
+       "is an alias for PasswordFile."],
+      [63, 'PlainUsers=s'      => 'PlainUsers',
+       "specifies the list of authorized users for the security types Plain, TLSPlain, and X509Plain." ],
+      [63, 'PAMService|pam_service=s' => 'PAMService',
+       "specifies the service name for PAM password validation that is used in case of security types Plain, TLSPlain, or X509Plain. On default, vnc is used if present otherwise tigervnc is used." ],
+      [63, 'X509Key=s'         => 'X509Key',
+       "denotes a X509 certificate key file (PEM format). This is used by the security types X509None, X509Vnc, and X509Plain." ],
+      [63, 'X509Cert=s'        => 'X509Cert',
+       "denotes the corresponding X509 certificate (PEM format)." ],
       [36, 'fg'                => 'fg',
        "if enabled, tigervncserver will stay in the foreground and the VNC server is killed after its X session has terminated." ],
+      [36, 'useold'            => 'useold',
+       "if given, start a VNC server only if one is not already running." ],
+      [36, 'verbose'           => 'verbose',
+       "if specified, debugging output is enabled." ],
+      [36, 'dry-run'           => 'dry-run',
+       "if enabled, no real action is taken only a simulation of what would be done is performed." ],
+      [36, 'I-KNOW-THIS-IS-INSECURE' => 'I-KNOW-THIS-IS-INSECURE' ],
+      # Parameters for both Xtigervnc and X0tigervnc (case insensitive)
+      [63, 'UseIPv4:b'         => 'UseIPv4' ],
+      [63, 'UseIPv6:b'         => 'UseIPv6' ],
+      [63, 'rfbunixpath=s'     => 'rfbunixpath' ],
+      [63, 'rfbunixmode=s'     => 'rfbunixmode' ],
+      [63, 'ClientWaitTimeMillis|rfbwait=i' => 'rfbwait' ],
+      [63, 'AcceptCutText:b'   => 'AcceptCutText' ],
+      [63, 'MaxCutText=i'      => 'MaxCutText' ],
+      [63, 'SendCutText:b'     => 'SendCutText' ],
+      [63, 'AcceptPointerEvents:b' => 'AcceptPointerEvents' ],
+      [63, 'AcceptKeyEvents:b' => 'AcceptKeyEvents' ],
+      [63, 'AcceptSetDesktopSize:b' => 'AcceptSetDesktopSize' ],
+      [63, 'DisconnectClients:b' => 'DisconnectClients' ],
+      [63, 'NeverShared:b'     => sub {
+          if (@_ == 2) {
+            if ($_[1] eq '' || $_[1] eq '1') {
+              &{$override}('shared', 'never');
+            } elsif ($options->{'shared'} eq 'never') {
+              &{$override}('shared', undef);
+            }
+          } elsif (defined $options->{'shared'}) {
+            return $options->{'shared'} eq 'never';
+          } else {
+            return undef;
+          }
+        } ],
+      [63, 'AlwaysShared:b'    => sub {
+          if (@_ == 2) {
+            if ($_[1] eq '' || $_[1] eq '1') {
+              &{$override}('shared', 'always');
+            } elsif ($options->{'shared'} eq 'always') {
+              &{$override}('shared', undef);
+            }
+          } elsif (defined $options->{'shared'}) {
+            return $options->{'shared'} eq 'always';
+          } else {
+            return undef;
+          }
+        } ],
+      [63, 'Password=s'        => 'Password' ],
+      [63, 'Protocol3.3:b'     => 'Protocol3.3' ],
+      [63, 'FrameRate=i'       => 'FrameRate' ],
+      [63, 'CompareFB=s'       => 'CompareFB' ],
+      [63, 'ZlibLevel=i'       => 'ZlibLevel' ],
+      [63, 'ImprovedHextile:b' => 'ImprovedHextile' ],
+      [63, 'GnuTLSPriority=s'  => 'GnuTLSPriority' ],
+      [63, 'UseBlacklist:b'    => 'UseBlacklist' ],
+      [63, 'BlacklistThreshold=i' => 'BlacklistThreshold' ],
+      [63, 'BlacklistTimeout=i' => 'BlacklistTimeout' ],
+      [63, 'IdleTimeout=i'     => 'IdleTimeout' ],
+      [63, 'MaxDisconnectionTime=i' => 'MaxDisconnectionTime' ],
+      [63, 'MaxConnectionTime=i' => 'MaxConnectionTime' ],
+      [63, 'MaxIdleTime=i'     => 'MaxIdleTime' ],
+      [63, 'QueryConnect:b'    => 'QueryConnect' ],
+      [63, 'QueryConnectTimeout=i' => 'QueryConnectTimeout' ],
+      [63, 'Log=s'             => 'Log' ],
+      [63, 'RemapKeys=s'       => 'RemapKeys' ],
+      [63, 'RawKeyboard:b'     => 'RawKeyboard' ],
+      # Options only for tigervncserver
+      [15, 'desktop=s'         => 'desktopName',
+       "specifies the VNC desktop name." ],
+      # Backward compatible command line option
+      [ 4, 'name=s'            => 'desktopName',
+       "is an alias for desktop."],
       [ 4, 'autokill'          => 'autokill',
        "if enabled, the VNC server is killed after its X session has terminated." ],
       [ 4, 'xstartup:s'        => sub {
@@ -389,65 +487,8 @@ sub getOptionParseTable($$) {
           }
         },
         "if specified, shrinks the geometry by the given <width>x<height> value." ],
-      [36, 'useold'            => 'useold',
-       "if given, start a VNC server only if one is not already running." ],
-      [36, 'cleanstale'        => 'cleanstale',
-       "if provided, clean up pid and lockfiles of stale VNC server instances of the user." ],
-      [36, 'clean'             => 'clean',
-       "if specified, the log files of the terminated VNC session will also be removed." ],
-      [36, 'verbose'           => 'verbose',
-       "if specified, debugging output is enabled." ],
-      [36, 'dry-run'           => 'dry-run',
-       "if enabled, no real action is taken only a simulation of what would be done is performed." ],
-      [36, 'I-KNOW-THIS-IS-INSECURE' => 'I-KNOW-THIS-IS-INSECURE' ],
-      # Config file stuff
-      [ 6, 'session=s'         => sub {
-          if (@_ == 2) {
-            my $sn;
-            if (!defined($_[1]) || $_[1] eq '') {
-              $sn = [];
-            } elsif (ref($_[1]) eq 'ARRAY') {
-              $sn = $_[1];
-            } elsif (ref($_[1]) eq '') {
-              my $sessionCommand = undef;
-              $sn = [split(qr{\s+}, $_[1])];
-              $sessionCommand = loadXSession($_[1]) unless $_[1] =~ m{/};
-              my $found = 0;
-              if (defined $sessionCommand) {
-                $sn = [$sessionCommand];
-                $found = 1;
-              } elsif (@{$sn} > 0) {
-                foreach my $dir (split(/:/,$ENV{PATH})) {
-                  my $fqcmd = File::Spec->catfile($dir, $sn->[0]);
-                  if (-x $fqcmd) {
-                    $found = 1;
-                    $sn->[0] = $fqcmd;
-                    last;
-                  }
-                }
-              }
-              unless ($found) {
-                print STDERR "$PROG: Warning: No X session desktop file or command for $_[1]\n";
-              }
-            } else {
-              die "Option $_[0] must be set to a string or array reference!";
-            }
-            &{$override}('session', $sn);
-          } else {
-            return $options->{'session'};
-          }
-        },
-       "specifies the X11 session to start with either a command or a session name." ],
-      [ 2, 'sslAutoGenCertCommand=s' => 'sslAutoGenCertCommand' ],
-      [ 2, 'vncUserDir=s'      => 'vncUserDir' ],
-      [ 2, 'vncStartup=s'      => 'vncStartup' ],
-      [ 2, 'xauthorityFile=s'  => 'xauthorityFile' ],
-      [ 2, 'getDefaultFrom=s'  => 'getDefaultFrom' ],
-      # Arguments from Xtigervnc (case sensitive)
-      [14, 'auth=s'            => 'xauthorityFile' ],
       [14, 'fp=s'              => 'fontPath',
        "specifies a colon separated list of font locations." ],
-      [ 2, 'fontPath=s'        => 'fontPath' ],
       [14, 'depth=i'           => sub {
           if (@_ == 2) {
             if (defined $_[1]) {
@@ -488,6 +529,45 @@ sub getOptionParseTable($$) {
           }
         },
         "defines the X11 server pixel format. Valid values are rgb888, rgb565, rgb332, bgr888, bgr565, or bgr233." ],
+      [ 6, 'session=s'         => sub {
+          if (@_ == 2) {
+            my $sn;
+            if (!defined($_[1]) || $_[1] eq '') {
+              $sn = [];
+            } elsif (ref($_[1]) eq 'ARRAY') {
+              $sn = $_[1];
+            } elsif (ref($_[1]) eq '') {
+              my $sessionCommand = undef;
+              $sn = [split(qr{\s+}, $_[1])];
+              $sessionCommand = loadXSession($_[1]) unless $_[1] =~ m{/};
+              my $found = 0;
+              if (defined $sessionCommand) {
+                $sn = [$sessionCommand];
+                $found = 1;
+              } elsif (@{$sn} > 0) {
+                foreach my $dir (split(/:/,$ENV{PATH})) {
+                  my $fqcmd = File::Spec->catfile($dir, $sn->[0]);
+                  if (-x $fqcmd) {
+                    $found = 1;
+                    $sn->[0] = $fqcmd;
+                    last;
+                  }
+                }
+              }
+              unless ($found) {
+                print STDERR "$PROG: Warning: No X session desktop file or command for $_[1]\n";
+              }
+            } else {
+              die "Option $_[0] must be set to a string or array reference!";
+            }
+            &{$override}('session', $sn);
+          } else {
+            return $options->{'session'};
+          }
+        },
+       "specifies the X11 session to start with either a command or a session name." ],
+      # Arguments from Xtigervnc (case sensitive)
+      [14, 'auth=s'            => 'xauthorityFile' ],
       # -inetd is not handled
       [14, 'interface=s'       => sub {
           if (@_ == 2) {
@@ -500,13 +580,6 @@ sub getOptionParseTable($$) {
       # Parameters for Xtigervnc (case insensitive)
       [15, 'AvoidShiftNumLock:b' => 'AvoidShiftNumLock' ],
       [15, 'AllowOverride=s'   => 'AllowOverride' ],
-      [15, 'desktop=s'         => 'desktopName',
-       "specifies the VNC desktop name." ],
-      # Backward compatible command line option
-      [ 4, 'name=s'            => 'desktopName',
-       "Alias for desktop"],
-      # Backward compatible configuration file option
-      [ 2, 'desktopName=s'     => 'desktopName' ],
       [15, 'SendPrimary:b'     => 'SendPrimary' ],
       # Parameters for X0tigervnc (case insensitive)
       [49, 'HostsFile=s'       => 'HostsFile' ],
@@ -514,85 +587,18 @@ sub getOptionParseTable($$) {
       [49, 'MaxProcessorUsage=i' => 'MaxProcessorUsage' ],
       [49, 'PollingCycle=i'    => 'PollingCycle' ],
       [49, 'UseSHM:b'          => 'UseSHM' ],
-      # Parameters for both Xtigervnc and X0tigervnc (case insensitive)
-      [63, 'rfbport=i'         => 'rfbport',
-       "provides the TCP port to be used for the RFB protocol." ],
-      [63, 'UseIPv4:b'         => 'UseIPv4' ],
-      [63, 'UseIPv6:b'         => 'UseIPv6' ],
-      [63, 'rfbunixpath=s'     => 'rfbunixpath' ],
-      [63, 'rfbunixmode=s'     => 'rfbunixmode' ],
-      [63, 'ClientWaitTimeMillis|rfbwait=i' => 'rfbwait' ],
-      [63, 'PasswordFile|rfbauth=s' => 'vncPasswdFile',
-       "Password file for security types VncAuth, TLSVnc, and X509Vnc. On default, ~/.vnc/passwd is used." ],
-      # Backward compatible command line option
-      [36, 'passwd=s'          => 'vncPasswdFile',
-       "Alias for PasswordFile"],
-      # Backward compatible configuration file option
+      # Config file stuff
+      [ 2, 'sslAutoGenCertCommand=s' => 'sslAutoGenCertCommand' ],
+      [ 2, 'vncUserDir=s'      => 'vncUserDir' ],
+      [ 2, 'vncStartup=s'      => 'vncStartup' ],
+      [ 2, 'xauthorityFile=s'  => 'xauthorityFile' ],
+      [ 2, 'getDefaultFrom=s'  => 'getDefaultFrom' ],
+      # Backward compatible configuration file option for desktop
+      [ 2, 'desktopName=s'     => 'desktopName' ],
+      # Backward compatible configuration file optionfor PasswordFile
       [ 2, 'vncPasswdFile=s'   => 'vncPasswdFile' ],
-      [63, 'AcceptCutText:b'   => 'AcceptCutText' ],
-      [63, 'MaxCutText=i'      => 'MaxCutText' ],
-      [63, 'SendCutText:b'     => 'SendCutText' ],
-      [63, 'AcceptPointerEvents:b' => 'AcceptPointerEvents' ],
-      [63, 'AcceptKeyEvents:b' => 'AcceptKeyEvents' ],
-      [63, 'AcceptSetDesktopSize:b' => 'AcceptSetDesktopSize' ],
-      [63, 'DisconnectClients:b' => 'DisconnectClients' ],
-      [63, 'NeverShared:b'     => sub {
-          if (@_ == 2) {
-            if ($_[1] eq '' || $_[1] eq '1') {
-              &{$override}('shared', 'never');
-            } elsif ($options->{'shared'} eq 'never') {
-              &{$override}('shared', undef);
-            }
-          } elsif (defined $options->{'shared'}) {
-            return $options->{'shared'} eq 'never';
-          } else {
-            return undef;
-          }
-        } ],
-      [63, 'AlwaysShared:b'    => sub {
-          if (@_ == 2) {
-            if ($_[1] eq '' || $_[1] eq '1') {
-              &{$override}('shared', 'always');
-            } elsif ($options->{'shared'} eq 'always') {
-              &{$override}('shared', undef);
-            }
-          } elsif (defined $options->{'shared'}) {
-            return $options->{'shared'} eq 'always';
-          } else {
-            return undef;
-          }
-        } ],
-      [63, 'Protocol3.3:b'     => 'Protocol3.3' ],
-      [63, 'FrameRate=i'       => 'FrameRate' ],
-      [63, 'CompareFB=s'       => 'CompareFB' ],
-      [63, 'ZlibLevel=i'       => 'ZlibLevel' ],
-      [63, 'ImprovedHextile:b' => 'ImprovedHextile' ],
-      [63, 'SecurityTypes=s'   => 'SecurityTypes',
-       "specifies a comma list of security types to offer (None, VncAuth, Plain, TLSNone, TLSVnc, TLSPlain, X509None, X509Vnc, X509Plain). On default, offer only VncAuth." ],
-      [63, 'Password=s'        => 'Password' ],
-      [63, 'PlainUsers=s'      => 'PlainUsers',
-       "specifies the list of authorized users for the security types Plain, TLSPlain, and X509Plain." ],
-      [63, 'PAMService|pam_service=s' => 'PAMService',
-       "specifies the service name for PAM password validation that is used in case of security types Plain, TLSPlain, or X509Plain. On default, vnc is used if present otherwise tigervnc is used." ],
-      [63, 'X509Key=s'         => 'X509Key',
-       "denotes a X509 certificate key file (PEM format). This is used by the security types X509None, X509Vnc, and X509Plain." ],
-      [63, 'X509Cert=s'        => 'X509Cert',
-       "denotes the corresponding X509 certificate (PEM format)." ],
-      [63, 'GnuTLSPriority=s'  => 'GnuTLSPriority' ],
-      [63, 'UseBlacklist:b'    => 'UseBlacklist' ],
-      [63, 'BlacklistThreshold=i' => 'BlacklistThreshold' ],
-      [63, 'BlacklistTimeout=i' => 'BlacklistTimeout' ],
-      [63, 'IdleTimeout=i'     => 'IdleTimeout' ],
-      [63, 'MaxDisconnectionTime=i' => 'MaxDisconnectionTime' ],
-      [63, 'MaxConnectionTime=i' => 'MaxConnectionTime' ],
-      [63, 'MaxIdleTime=i'     => 'MaxIdleTime' ],
-      [63, 'QueryConnect:b'    => 'QueryConnect' ],
-      [63, 'QueryConnectTimeout=i' => 'QueryConnectTimeout' ],
-      [63, 'localhost:b'       => 'localhost',
-       "if enabled, VNC will only accept connections from localhost." ],
-      [63, 'Log=s'             => 'Log' ],
-      [63, 'RemapKeys=s'       => 'RemapKeys' ],
-      [63, 'RawKeyboard:b'     => 'RawKeyboard' ],
+      # Backward compatible configuration file option for fp
+      [ 2, 'fontPath=s'        => 'fontPath' ],
     );
 
   my $optionParseTable = [];
@@ -1158,7 +1164,7 @@ sub usage {
         push @{$opts{$defname}}, {
             opt   => $opt,
             flags => $flags,
-            help  => "Alias for $defname"
+            help  => "is an alias for $defname."
           };
       }
     }
@@ -1195,7 +1201,7 @@ sub usage {
           help  => $opts{'display'}->[0]->{'help'} },
         { opt  => $opts{'display'}->[0]->{'opt'},
           flags => $opts{'display'}->[0]->{'flags'},
-          help => 'Alias for :<number>' },
+          help => 'is an alias for :<number>.' },
       ];
   }
   if (defined $opts{'session'}) {
