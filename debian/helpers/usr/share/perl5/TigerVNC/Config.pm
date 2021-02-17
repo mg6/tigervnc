@@ -493,8 +493,8 @@ sub getOptionParseTable($$) {
           if (@_ == 2) {
             if (defined $_[1]) {
               my $depth = int($_[1]);
-              if ($depth != 8 && $depth != 16 && $depth != 24 && $depth != 32) {
-                die "Invalid depth $depth must be one of 8, 16, 24, or 32!";
+              if ($depth != 16 && $depth != 24 && $depth != 32) {
+                die "Invalid depth $depth must be one of 16, 24, or 32!";
               }
               if (defined $options->{'pixelformat'}) {
                 $options->{'pixelformat'} =~ m/^(?:rgb|bgr)(\d)(\d)(\d)$/;
@@ -508,7 +508,7 @@ sub getOptionParseTable($$) {
             return $options->{'depth'};
           }
         },
-        "specifies the bit depth of the desktop, e.g., 8, 16, 24, or 32." ],
+        "specifies the bit depth of the desktop, e.g., 16, 24, or 32." ],
       [14, 'pixelformat=s'     => sub {
           if (@_ == 2) {
             if (defined $_[1]) {
@@ -516,7 +516,7 @@ sub getOptionParseTable($$) {
                 die "Invalid pixelformat $_[1]!";
               }
               my $depth = $1+$2+$3;
-              if ($depth != 8 && $depth != 16 && $depth != 24 && $depth != 32) {
+              if ($depth != 16 && $depth != 24 && $depth != 32) {
                 die "Invalid pixelformat $_[1]!";
               }
               if ($options->{'depth'} < $depth) {
@@ -528,7 +528,7 @@ sub getOptionParseTable($$) {
             return $options->{'pixelformat'};
           }
         },
-        "defines the X11 server pixel format. Valid values are rgb888, rgb565, rgb332, bgr888, bgr565, or bgr233." ],
+        "defines the X11 server pixel format. Valid values are rgb888, rgb565, bgr888, or bgr565." ],
       [ 6, 'session=s'         => sub {
           if (@_ == 2) {
             my $sn;
