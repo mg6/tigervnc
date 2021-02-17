@@ -655,9 +655,6 @@ sub startVncServer {
            ref($options->{'session'}) ne 'ARRAY') {
     $options->{'session'} = [];
   }
-  if (defined $options->{'localhost'}) {
-    $options->{'localhost'} = $options->{'localhost'} =~ m/^(?:yes|true|1)$/i;
-  }
   unless (defined $options->{'SecurityTypes'}) {
     if (!defined($options->{'localhost'}) || $options->{'localhost'}) {
       $options->{'SecurityTypes'} = 'VncAuth';
@@ -693,8 +690,8 @@ sub startVncServer {
     # we have at least one *None security type in there, then
     # we better only server VNC on localhost to be tunneled via
     # ssh.
-    $options->{'localhost'} = !$options->{'haveSSLEncryption'}
-                           || $options->{'noneAuthEnabled'};
+    $options->{'localhost'} =
+        (!$options->{'haveSSLEncryption'} || $options->{'noneAuthEnabled'}) ? 1 : 0;
   }
   # PREVENT THE USER FROM EXPOSING A VNC SESSION WITHOUT AUTHENTICATION
   # TO THE WHOLE INTERNET!!!
@@ -926,7 +923,7 @@ sub startVncServer {
       push @cmd, "-SecurityTypes", $options->{'SecurityTypes'};
       push @cmd, "-X509CA", $options->{'X509Cert'} if $options->{'x509CertRequired'};
       push @cmd, "-passwd", $options->{'vncPasswdFile'} if $options->{'vncAuthEnabled'};
-      push @cmd, $options->{'localhost'} =~ m/^(?:yes|true|1)$/i
+      push @cmd, $options->{'localhost'}
         ? ":$rfbport" : "$HOSTFQDN:$rfbport";
       push @status, "Use ".join(" ", @cmd)." to connect to the VNC server.";
     }
