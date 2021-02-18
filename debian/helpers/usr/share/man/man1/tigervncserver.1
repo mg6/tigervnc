@@ -15,305 +15,359 @@ tigervncserver \- start or stop a TigerVNC standaloe server
 .SH SYNOPSIS
 .
 .B tigervncserver
-.RI [[user@]host][:display#]
-.RB [ \-dry-run]
-.RB [ \-verbose ]
-.RB [ \-useold ]
-.RB [ \-cleanstale ]
-.RB [ \-localhost
-.IR [yes|no] ]
-.RB [ \-name
-.IR desktop-name ]
-.RB [ \-geometry
-.IR width x height ]
-.RB [ \-depth
-.IR depth ]
-.RB [ \-pixelformat
-.IR format ]
-.RB [ \-xdisplaydefaults ]
-.RB [ \-wmDecoration
-.IR width x height ]
-.RB [ \-fp
-.IR font-path ]
-.RB [ \-fg ]
-.RB [ \-autokill ]
-.RB [ \-noxstartup ]
-.RB [ \-xstartup
-.IR script ]
+.RI [[ user@ ] host ][ :display# ]
 .RB [ \-rfbport
-.IR port# ]
+.IR rfbport# ]
+.RB [ \-localhost
+.RI [ yes | no ]]
 .RB [ \-SecurityTypes
 .IR sec-types ]
+.RB [ \-PasswordFile | \-rfbauth
+.IR passwd-file ]
 .RB [ \-PlainUsers
 .IR user-list ]
-.RB [ \-PAMService
+.RB [ \-PAMService | \-pam_service
 .IR service-name ]
-.RB [ \-PasswordFile|\-passwd|\-rfbauth
-.IR passwd-file ]
 .RB [ \-X509Key
 .IR cert-key-file ]
 .RB [ \-X509Cert
 .IR cert-file ]
+.RB [ \-fg ]
+.RB [ \-useold ]
+.RB [ \-verbose ]
+.RB [ \-dry-run ]
+.RB [ \-geometry
+.IR <width>x<height> ]
+.RB [ \-wmDecoration
+.IR <width>x<height> ]
+.RB [ \-xdisplaydefaults ]
+.RB [ \-xstartup
+.IR script ]
+.RB [ \-noxstartup ]
+.RB [ \-desktop
+.IR desktop-name ]
+.RB [ \-depth
+.IR depth ]
+.RB [ \-pixelformat
+.IR format ]
+.RB [ \-autokill ]
+.RB [ \-fp
+.IR font-path ]
 .RI [ "Xtigervnc options..." ]
-.RB [ --
-.RI "X session or command with optional options..." \fP]
+.RB [ \-\-
+.IR "X session or command with optional options..." ]
 .
 .br
 .B tigervncserver \-kill
-.RI [[user@]host][:display#|:*]
+.RI [[ user@ ] host ][ :display# | :* ]
+.RB [ \-rfbport
+.IR rfbport# ]
 .RB [ \-dry-run]
 .RB [ \-verbose ]
 .RB [ \-clean ]
 .
 .br
 .B tigervncserver \-list
-.RI [[user@]host][:display#|:*]
+.RI [[ user@ ] host ][ :display# | :* ]
+.RB [ \-rfbport
+.IR rfbport# ]
 .RB [ \-cleanstale ]
 .
-.SH DESCRIPTION
-.B tigervncserver\fP is used to start a TigerVNC (Virtual Network Computing) desktop.
-.B tigervncserver\fP is a Perl wrapper script which simplifies the process of starting an instance of the TigerVNC server Xtigervnc.
-It runs Xtigervnc with appropriate options and starts some X applications to be displayed in the TigerVNC desktop.
+.br
+.B x0tigervncserver -version
 .
-.B tigervncserver\fP can be run with no options at all.
-In this case it will choose the first available display number (usually :1), start Xtigervnc as that display, and run a couple of basic applications to get you started.
-You can also specify the display number, in which case it will use that number if it is available and exit if not, e.g.:
+.SH DESCRIPTION
+.B tigervncserver\fP is used to start a TigerVNC (Virtual Network Computing)
+desktop. \fBtigervncserver\fP is a Perl wrapper script which simplifies the
+process of starting an instance of the \fBXtigervnc\fP VNC server. It runs
+\fBXtigervnc\fP with appropriate options and starts some X applications to be
+displayed in the TigerVNC desktop.
+.
+.B tigervncserver\fP can be run with no options at all. In this case it will
+choose the first available display number (usually :1), start \fBXtigervnc\fP
+as that display, and run a couple of basic applications to get you started. You
+can also specify the display number, in which case it will use that number if
+it is available and exit if not, e.g.:
 
 .RS
 tigervncserver :13
 .RE
 
-Moreover, a username and a hostname can be given to start the tigervncserver via SSH on the given machine under the provided user account, e.g.:
+Moreover, a username and a hostname can be given to start the \fBtigervncserver\fP
+via SSH on the given machine under the provided user account, e.g.:
 
 .RS
 tigervncserver franz@kopernikus:13
 .RE
 
-Note that this \fBrequires the same version\fP of the tigervncserver wrapper script on the remote machine as is on the local machine.
+Note that this \fBrequires the same version\fP of the \fBtigervncserver\fP
+wrapper script on the remote machine as is on the local machine.
 
-Creating the file \fI~/.vnc/Xtigervnc-session\fP allows you to change the applications run at startup (but note that this will not affect an existing desktop).
-.
-System defaults for this wrapper script are found in \fI/etc/tigervnc/vncserver-config-defaults\fP.
-These defaults can be overwritten by the user defaults given in \fI~/.vnc/tigervnc.conf\fP (see
-.BR tigervnc.conf (5x)).
-Next, command-line options overwrite the settings in both tigervnc configuration files.
-.
-Finally, options from \fI/etc/tigervnc/vncserver-config-mandatory\fP have the highest priority overwriting all previous settings.
+Creating the file \fI~/.vnc/Xtigervnc-session\fP allows you to change the
+applications run at startup (but note that this will not affect an existing
+desktop).
+
+System defaults for this wrapper script are found in
+\fI/etc/tigervnc/vncserver-config-defaults\fP. These defaults can be
+overwritten by the user defaults given in \fI~/.vnc/tigervnc.conf\fP (see the
+.BR tigervnc.conf (5x)
+man page). Next, command-line options overwrite the settings in both tigervnc
+configuration files. Finally, options from
+\fI/etc/tigervnc/vncserver-config-mandatory\fP have the highest priority
+overwriting all previous settings.
 
 \fBWARNING! There is nothing stopping users from constructing their own wrapper
 script that calls Xtigervnc directly to bypass any options defined in the
 /etc/tigervnc/vncserver-config-mandatory configuration file.\fP
 .SH OPTIONS
-You can get a list of options by giving \fB\-h\fP as an option to tigervncserver.
-In addition to the options listed below, any unrecognized options will be passed to Xtigervnc \(en see the
+You can get a list of options by giving \fB\-h\fP as an option to
+\fBtigervncserver\fP. In addition to the options listed below, any
+unrecognized options will be passed to \fBXtigervnc\fP \(en see the
 .BR Xtigervnc (1)
-man page, or "Xtigervnc \-help" for details.
+man page or "\fBXtigervnc \-help\fP" for details.
 .
 .TP
-.B \-dry-run
-Do not actually do anything, but only perform the checks if the requested action would be possible.
-For example, there will be checks performed for the availability of the requested display number display#.
+.I :display#
+Specifies the X11 display to be created by the \fBXtigervnc\fP server.
+.
+.TP
+.B \-rfbport \fIrfbport#\fP
+Specifies the TCP port on which \fBXtigervnc\fP listens for connections from viewers
+(the protocol used in VNC is called RFB \(en "remote framebuffer"). The default
+is 5900 plus the display number display#.
+.
+.TP
+.B -localhost\fP [\fIyes\fP|\fIno\fP]
+Should the TigerVNC server only listen on localhost for incoming TigerVNC
+connections. Useful if you use SSH and want to stop non-SSH connections from
+any other hosts. If the option is not specified, then the behavior is as
+follows: We will only listen on localhost if the \fIsec-types\fP list does not
+contain any \fITLS*\fP or \fIX509*\fP security types or if the list contains at
+least one \fI*None\fP security type. Otherwise, we will listen on all network
+addresses of the machine.
+.
+.TP
+.B \-SecurityTypes \fIsec-types\fP
+Specify which security scheme to use for incoming connections. Valid values
+are a comma separated list of \fINone\fP, \fIVncAuth\fP, \fIPlain\fP,
+\fITLSNone\fP, \fITLSVnc\fP, \fITLSPlain\fP, \fIX509None\fP, \fIX509Vnc\fP, and
+\fIX509Plain\fP. Default is \fIVncAuth\fP if \fB\-localhost\fP is not given
+and \fIVncAuth,TLSVnc\fP if \fB\-localhost\fP \fIno\fP is given.
+.
+.TP
+.B \-PasswordFile \fIpasswd-file\fP | \-rfbauth \fIpasswd-file\fP
+Specifies the file containing the password used to authenticate viewers for the
+security types \fIVncAuth\fP, \fITLSVnc\fP, and \fIX509Vnc\fP. The
+\fIpasswd-file\fP is accessed each time a connection comes in, so it can be
+changed on the fly via \fBtigervncpasswd\fP(1). The default password file is
+\fI~/.vnc/passwd\fP.
+.
+.TP
+.B \-PlainUsers \fIuser-list\fP
+A comma separated list of user names that are allowed to authenticate via any
+of the\fI *Plain\fP security types (\fIPlain\fP, \fITLSPlain\fP, etc.). Specify
+\fI*\fP to allow any user to authenticate using this security type. Default is
+to only allow the user that has started the \fBtigervncserver\fP wrapper
+script.
+.
+.TP
+\fB\-PAMService \fIservice-name\fP | \fB\-pam_service \fIservice-name\fP
+PAM service name to use when authenticating users using any of the\fI *Plain\fP
+security types. Default is\fB vnc\fP if /etc/pam.d/vnc is present and
+\fBtigervnc\fP otherwise. The tigervnc-common-server package ships the
+/etc/pam.d/tigervnc PAM service configuration for use by
+\fBtigervncserver\fP.
+.
+.TP
+.B \-X509Cert\fP \fIcert-path\fP and\fB \-X509Key\fP \fIkey-path\fP
+Path to a X509 certificate in PEM format to be used for all \fIX509\fP based
+security types (i.e., \fIX509None\fP, \fIX509Vnc\fP, etc.) as well as its
+private key also in PEM format. If the certificate and its key are not provided
+via the\fB \-X509Cert\fP and\fB \-X509Key\fP command-line options or their
+corresponding configuration parameters in
+\fI/etc/tigervnc/vncserver-config-defaults\fP, \fI~/.vnc/tigervnc.conf\fP, or
+\fI/etc/tigervnc/vncserver-config-mandatory\fP, then the \fBtigervncserver\fP
+wrapper script auto generates a self signed certificate. The auto generated
+self signed certificates are stored in the files ~/.vnc/\fIhost\fP-SrvCert.pem
+and ~/.vnc/\fIhost\fP-SrvKey.pem.
+.
+.TP
+.B \-fg
+Runs the Xtigervnc-session as a foreground process. This has two effects: (1)
+The Xtigervnc-session can be aborted with CTRL-C, and (2) the TigerVNC server
+will be killed as soon as the user logs out of the window manager in the
+Xtigervnc-session. This may be necessary when launching TigerVNC from within
+certain grid computing environments.
+.
+.TP
+.B \-useold
+Only start a new TigerVNC server if a VNC server for your account is not
+already running on the requested display number \fIdisplay#\fP and RFB port
+\fIrfbport#\fP. If no display number is requested, a new TigerVNC server
+will only be started if there is no TigerVNC server running under your user
+account. In any case, information about the newly started TigerVNC server or
+the reused TigerVNC server session will be printed.
 .
 .TP
 .B \-verbose
 This will turn on some debug output.
 .
 .TP
-.B \-useold
-Only start a new TigerVNC server if a Xtigervnc server for your account is not already running on the requested display number display#.
-If no display number is requested, a new TigerVNC server will only be started if there is no TigerVNC server running under your user account.
-In any case, information about the newly started TigerVNC server or the reused TigerVNC server session will be printed.
+.B \-dry-run
+Do not actually do anything, but only perform the checks if the requested
+action would be possible. For example, there will be checks performed for the
+availability of the requested display number display#.
 .
 .TP
-.B \-cleanstale
-Sometimes the Xtigervnc server crashes and does not clean up correctly.
-In this case, there will be a stale pidfile in ~/.vnc as well as stale X11 locks and sockets in /tmp.
-When the \-cleanstale option is given, then tigervncserver first tries to cleanup all these stale files before trying to determine which X display number is available for use.
+.B \-geometry \fI<width>x<height>\fP
+This option specifies the size of the desktop to be created. On default, a
+1920x1200 desktop is created.
 .
 .TP
-.B -localhost\fP [\fIyes\fP|\fIno\fP]
-Should the TigerVNC server only listen on localhost for incoming TigerVNC connections.
-Useful if you use SSH and want to stop non-SSH connections from any other hosts.
-If the option is not specified, then the behavior is as follows:
-We will only listen on localhost if the \fI sec-types\fP list does not contain any\fB TLS*\fP or\fB X509*\fP security types or if the list contains at least one\fP *None\fP security type.
-Otherwise, we will listen on all network addresses of the machine.
+.B \-wmDecoration \fI<width>x<height>\fP
+sets the adjustment of the dimensions derived by \fB \-xdisplaydefaults\fP to
+accommodate the window decoration used by the X11 window manager. This is used
+to fully display the VNC desktop even if the VNC viewer is not in full screen
+mode.
 .
 .TP
-.B \-name \fIdesktop-name\fP
+.B \-xdisplaydefaults
+The\fB \-xdisplaydefaults\fP option can be used to derive values for the above
+three options, i.e., \fB -geometry\fP to\fB \-pixelformat\fP, from the running
+X session. The derived dimensions are adjusted by the \fB \-wmDecoration\fP
+option.
+.
+.TP
+.B \-xstartup \fIscript\fP
+Run a custom startup script, instead of \fI~/.vnc/Xtigervnc-session\fP, after
+launching \fBXtigervnc\fP. This is useful to run full-screen applications.
+.
+.TP
+.B \-noxstartup
+Do not run the \fI~/.vnc/Xtigervnc-session\fP script after launching
+\fBXtigervnc\fP. This option allows you to manually start a window manager in
+your TigerVNC session.
+.
+.TP
+.B \-desktop \fIdesktop-name\fP
 Each desktop has a name which may be displayed by the viewer. It defaults to
 "\fIhost\fP:\fIdisplay#\fP (\fIusername\fP)" but you can change it with this
-option. It is passed in to the Xtigervnc-session script via the $VNCDESKTOP environment
-variable, allowing you to run a different set of applications according to the
-name of the desktop.
-.
-.TP
-.B \-geometry \fIwidth\fPx\fIheight\fP
-Specify the size of the desktop to be created. Default is 1024x768.
+option. It is passed in to the Xtigervnc-session script via the $VNCDESKTOP
+environment variable, allowing you to run a different set of applications
+according to the name of the desktop.
 .
 .TP
 .B \-depth \fIdepth\fP
 Specify the pixel depth in bits of the desktop to be created. Default is 24,
-other possible values are 8, 15 and 16 - anything else is likely to cause
-strange behavior by applications.
+other possible values are 16 and 32. Anything else is likely to cause strange
+behaviour by applications and may prevent the server from starting at all.
 .
 .TP
 .B \-pixelformat \fIformat\fP
-Specify pixel format for server to use (BGRnnn or RGBnnn).  The default for
-depth 8 is BGR233 (meaning the most significant two bits represent blue, the
-next three green, and the least significant three represent red), the default
-for depth 16 is RGB565 and for depth 24 is RGB888.
-.
-.TP
-.B \-cc 3
-As an alternative to the default TrueColor visual, this allows you to run an
-Xtigervnc server with a PseudoColor visual (i.e. one which uses a color map or
-palette), which can be useful for running some old X applications which only
-work on such a display.  Values other than 3 (PseudoColor) and 4 (TrueColor)
-for the \-cc option may result in strange behavior, and PseudoColor desktops
-must be 8 bits deep.
-.
-.TP
-.B \-xdisplaydefaults
-The\fB \-xdisplaydefaults\fP option can be used to derive values for the above three options, i.e., \fB -geometry\fP to\fB \-pixelformat\fP, from the running X session.
-The derived dimensions are adjusted by the \fB \-wmDecoration\fP option.
-.
-.TP
-.B \-wmDecoration \fIwidth\fPx\fIheight\fP
-sets the adjustment of the dimensions derived by \fB \-xdisplaydefaults\fP to accommodate the window decoration used by the X11 window manager.
-This is used to fully display the VNC desktop even if the VNC viewer is not in full screen mode.
-.
-.TP
-.B \-fp \fIfont-path\fP
-If the tigervncserver script detects that a font path is configured in
-/etc/X11/xorg.conf, it will attempt to use this font path for Xtigervnc.  Otherwise,
-if no fond path is configured, the tigervncserver script will attempt to start Xtigervnc
-and allow Xtigervnc to use its own preferred method of font handling (which may be a
-hard-coded font path or, on more recent systems, a font catalog.)
-.
-The
-.B \-fp
-argument allows you to override the above logic and specify a font
-path for Xtigervnc to use.
-.
-.TP
-.B \-fg
-Runs the Xtigervnc-session as a foreground process. This has two effects: (1) The
-Xtigervnc-session can be aborted with CTRL-C, and (2) the TigerVNC server will be
-killed as soon as the user logs out of the window manager in the Xtigervnc-session.
-This may be necessary when launching TigerVNC from within certain grid
-computing environments.
+Specify pixel format for the server to use (BGRnnn or RGBnnn). The default for
+depth 16 is RGB565 (meaning the most significant five bits represent red, the
+next six green, and the least significant five represent blue) and for depth 24
+and 32 is RGB888.
 .
 .TP
 .B \-autokill
-Automatically kills the TigerVNC server whenever the Xtigervnc-session script exits.
-In most cases, this has the effect of terminating Xtigervnc when the user logs
-out of the window manager.
+Automatically kills the TigerVNC server whenever the Xtigervnc-session script
+exits. In most cases, this has the effect of terminating \fBXtigervnc\fP when the
+user logs out of the window manager.
 .
 .TP
-.B \-noxstartup
-Do not run the ~/.vnc/Xtigervnc-session script after launching Xtigervnc.
-This option allows you to manually start a window manager in your TigerVNC session.
+.B \-fp \fIfont-path\fP
+Specifies a font path. Otherwise, if no font path is configured, the
+\fBXtigervnc\fP server will use its own preferred method of font handling.
 .
 .TP
-.B \-xstartup \fIscript\fP
-Run a custom startup script, instead of ~/.vnc/Xtigervnc-session, after launching Xtigervnc.
-This is useful to run full-screen applications.
+.BI \-\- " X session"
+This special option can be used to control which X session type will be
+started. This should match one of the files in \fI/usr/share/xsessions\fP. For
+example, if there is a file called \fIgnome.desktop\fP, then \fB\-\-\fP \fIgnome\fP
+would start this X session.
 .
 .TP
-.B \-rfbport \fIport#\fP
-Specifies the TCP port on which Xtigervnc listens for connections from viewers (the protocol used in VNC is called RFB - "remote framebuffer").
-The default is 5900 plus the display number display#.
-.
-.TP
-.B \-SecurityTypes \fIsec-types\fP
-Specify which security scheme to use for incoming connections.
-Valid values are a comma separated list of \fBNone\fP, \fBVncAuth\fP, \fBPlain\fP, \fBTLSNone\fP, \fBTLSVnc\fP, \fBTLSPlain\fP, \fBX509None\fP, \fBX509Vnc\fP and \fBX509Plain\fP.
-Default is \fBVncAuth\fP if \fB\-localhost\fP is not given and \fBVncAuth\fP,\fB TLSVnc\fP if\fB \-localhost\fP\fI no\fP is given.
-.
-.TP
-.B \-PlainUsers \fIuser-list\fP
-A comma separated list of user names that are allowed to authenticate via any of the\fB *Plain\fP security types (Plain, TLSPlain, etc.).
-Specify \fB*\fP to allow any user to authenticate using this security type.
-Default is to only allow the user that has started the tigervncserver wrapper script.
-.
-.TP
-.B \-PAMService \fIservice-name\fP
-PAM service name to use when authenticating users using any of the\fB *Plain\fP security types.
-Default is\fB vnc\fP if /etc/pam.d/vnc is present and\fB tigervnc\fP otherwise.
-The tigervnc-common-server package ships the /etc/pam.d/tigervnc PAM service configuration for use by tigervncserver.
-.
-.TP
-.B \-PasswordFile \fIpasswd-file\fP | \-passwd \fIpasswd-file\fP | \-rfbauth \fIpasswd-file\fP
-Specifies the file containing the password used to authenticate viewers for the security types VncAuth, TLSVnc, and X509Vnc.
-The \fIpasswd-file\fP is accessed each time a connection comes in, so it can be changed on the fly via \fBtigervncpasswd\fP(1).
-The default password file is ~/.vnc/passwd.
-.
-.TP
-.B \-X509Cert\fP \fIcert-path\fP and\fB \-X509Key\fP \fIkey-path\fP
-Path to a X509 certificate in PEM format to be used for all X509 based security types (X509None, X509Vnc, etc.) as well as its private key also in PEM format.
-If the certificate and its key are not provided via the\fB \-X509Cert\fP and\fB \-X509Key\fP command-line options or their corresponding configuration parameters in \fI/etc/tigervnc/vncserver-config-defaults\fP, \fI~/.vnc/tigervnc.conf\fP, or \fI/etc/tigervnc/vncserver-config-mandatory\fP, then the tigervncserver wrapper script auto generates a self signed certificate.
-The auto generated self signed certificates are stored in the files ~/.vnc/\fIhost\fP-SrvCert.pem and ~/.vnc/\fIhost\fP-SrvKey.pem.
-.
-.TP
-.B \-\- X session
-This special option can be used to control which X session type will be started. This should match
-one of the files in \fI/usr/share/xsessions\fP. For example, if there is a file called
-\fIgnome.desktop\fP, then \fB\-\- gnome\fP would start this X session.
-.
-.TP
-.B \-kill [[\fIuser\fP@]\fIhost\fP][:\fIdisplay#\fP|:*]
-This kills a TigerVNC desktop previously started with tigervncserver.
-It does this by killing the Xtigervnc process, whose process ID is stored in the file ~/.vnc/\fIhost\fP:\fIdisplay#\fP.pid.
-This can be useful so you can write "tigervncserver \-kill $DISPLAY", e.g., at the end of your Xtigervnc-session file after a particular application exits.
-If\fB :*\fP is given, then tigervncserver tries to kill all Xtigervnc processes with pidfiles in ~/.vnc on the local machine.
-If no display number is given, then tigervncserver tries to kill the Xtigervnc processes of the user on the local machine if only one such process is running and has a pidfile in ~/.vnc.
-If a\fI host\fP is specified, then tigervncserver will use SSH to kill a Xtigervnc process on the remote machine.
-.
+.B \-kill \fP[[\fIuser@\fP]\fIhost\fP][\fI:display#\fP|\fI:*\fP] [\fB\-rfbport \fIrfbport#\fP]
+This kills a TigerVNC server previously started with \fBtigervncserver\fP or
+\fBx0tigervncserver\fP. It does this by killing the \fBXtigervnc\fP process, whose
+process ID is stored in the file ~/.vnc/\fIhost\fP:\fIrfbport#\fP.pid. This can
+be useful so you can write "tigervncserver \-kill $DISPLAY", e.g., at the end
+of your Xtigervnc-session file after a particular application exits. If\fB
+:*\fP is given, then \fBtigervncserver\fP tries to kill all \fBXtigervnc\fP processes with
+pidfiles in \fI~/.vnc\fP on the local machine. If no display number is given, then
+\fBtigervncserver\fP tries to kill the \fBXtigervnc\fP processes of the user on the local
+machine if only one such process is running and has a pidfile in \fI~/.vnc\fP. If a
+\fIhost\fP is specified, then \fBtigervncserver\fP will use SSH to kill a \fBXtigervnc\fP
+process on the remote machine.
 .TP
 .B \-clean
-If given with\fB \-kill\fP, then the logfile ~/.vnc/\fIhost\fP:\fIdisplay#\fP.log is also removed.
+If given with\fB \-kill\fP, then the logfile
+~/.vnc/\fIhost\fP:\fIrfbport#\fP.log is also removed.
 .
 .TP
-.B \-list [[\fIuser\fP@]\fIhost\fP][:\fIdisplay#\fP|:*]
-This lists all running TigerVNC desktop previously started with tigervncserver.
-If a\fI host\fP is specified, then tigervncserver will use SSH to list Xtigervnc desktops on the remote machine.
-Stale entries are marked with (stale) in the output.
+.B \-list \fP[[\fIuser@\fP]\fIhost\fP][\fI:display#\fP|\fI:*\fP] [\fB\-rfbport \fIrfbport#\fP]
+This lists all running TigerVNC servers previously started with
+\fBtigervncserver\fP or \fBx0tigervncserver\fP. If a\fI host\fP is specified,
+then \fBtigervncserver\fP will use SSH to list VNC desktops on the remote
+machine. Stale entries are marked with (stale) in the output.
+.
+.TP
+.B \-cleanstale
+If given with \fB\-list\fP, then stale entries \(en resulting from missed
+cleanups of pidfiles in \fI~/.vnc\fP as well as stale X11 locks and sockets in
+/tmp due to \fBXtigervnc\fP or \fBX0tigervnc\fP server crashes \(en are cleaned
+up and not shown in the output of \fB-list\fP.
 .
 .SH FILES
 Several TigerVNC-related files are found in the \fI~/.vnc\fP directory:
 .TP
 .I ~/.vnc/tigervnc.conf
-The user configuration file for tigervncserver.
+The user configuration file for \fBtigervncserver\fP.
 .TP
 .I ~/.vnc/Xtigervnc-session
-A shell script specifying X applications to be run when a TigerVNC desktop is started.
-To be compatible with older versions of this wrapper script, we will also use the file \fI~/.vnc/xstartup\fP if it is present.
-If it doesn't exist, the system default provided in \fI/etc/tigervnc/vncserver-config-defaults\fP is used.
-A mandatory start script can also be given in \fI/etc/tigervnc/vncserver-config-mandatory\fP.
+A shell script specifying X applications to be run when a TigerVNC desktop is
+started. To be compatible with older versions of this wrapper script, we will
+also use the file \fI~/.vnc/xstartup\fP if it is present. If it doesn't exist,
+the system default provided in \fI/etc/tigervnc/vncserver-config-defaults\fP is
+used. A mandatory start script can also be given in
+\fI/etc/tigervnc/vncserver-config-mandatory\fP.
 .TP
 .I ~/.vnc/passwd
-The TigerVNC password file for the security types VncAuth, TLSVnc, and X509Vnc.
+The TigerVNC password file for the security types \fIVncAuth\fP, \fITLSVnc\fP,
+and \fIX509Vnc\fP.
 .TP
-.I ~/.vnc/<host>:<display#>.log
-The log file for Xtigervnc and applications started in Xtigervnc-session.
+.I ~/.vnc/<host>:<rfbport#>.log
+The log file for the VNC server and the applications started by Xtigervnc-session.
 .TP
-.I ~/.vnc/<host>:<display#>.pid
-Identifies the Xtigervnc process ID, used by the\fB \-kill\fP option.
+.I ~/.vnc/<host>:<rfbport#>.pid
+Identifies the VNC server process ID, used by the\fB \-kill\fP option.
 .TP
 .I ~/.vnc/<host>-SrvCert.pem\fP and \fI<host>-SrvKey.pem
-The security types X509None, X509Vnc, and X509Plain need a certificate and the corresponding private key.
-If these are not provided via the\fB \-X509Cert\fP and\fB \-X509Key\fP command-line options or their corresponding configuration parameters in \fI/etc/tigervnc/vncserver-config-defaults\fP, \fI~/.vnc/tigervnc.conf\fP, or \fI/etc/tigervnc/vncserver-config-mandatory\fP, then the tigervncserver wrapper script auto generates a self signed certificate for the\fB \-X509Cert\fP and\fB \-X509Key\fP options of the Xtigervnc server.
-The auto generated self signed certificates are stored in the above given two files.
-If the user wants their own certificate \(en instead of the on demand auto generated one \(en they can either specify it via the\fB \-X509Cert\fP and\fB \-X509Key\fP options to the tigervncserver wrapper script or replace the auto generated files ~/.vnc/\fIhost\fP-SrvCert.pem and ~/.vnc/\fIhost\fP-SrvKey.pem.
-These files will not be overwritten once generated by the tigervncserver wrapper script.
+The security types \fIX509None\fP, \fIX509Vnc\fP, and \fIX509Plain\fP need a
+certificate and the corresponding private key. If these are not provided via
+the\fB \-X509Cert\fP and\fB \-X509Key\fP command-line options or their
+corresponding configuration parameters in
+\fI/etc/tigervnc/vncserver-config-defaults\fP, \fI~/.vnc/tigervnc.conf\fP, or
+\fI/etc/tigervnc/vncserver-config-mandatory\fP, then the \fBtigervncserver\fP
+wrapper script auto generates a self signed certificate for the\fB
+\-X509Cert\fP and\fB \-X509Key\fP options of the \fBXtigervnc\fP server. The
+auto generated self signed certificates are stored in the above given two
+files. If the user wants their own certificate \(en instead of the on demand
+auto generated one \(en they can either specify it via the\fB \-X509Cert\fP
+and\fB \-X509Key\fP options to the \fBtigervncserver\fP wrapper script or
+replace the auto generated files ~/.vnc/\fIhost\fP-SrvCert.pem and
+~/.vnc/\fIhost\fP-SrvKey.pem. These files will not be overwritten once
+generated by the \fBtigervncserver\fP wrapper script.
 .PP
-Furthermore, there are global configuration files for tigervncserver in the \fI/etc/tigervnc\fP directory:
+Furthermore, there are global configuration files for \fBtigervncserver\fP in
+the \fI/etc/tigervnc\fP directory:
 .TP
 .I /etc/tigervnc/vncserver-config-defaults
-The global configuration file specifying the defaults for tigervncserver.
+The global configuration file specifying the defaults for \fBtigervncserver\fP.
 .TP
 .I /etc/tigervnc/vncserver-config-mandatory
-If this file exists and defines options to be passed to Xtigervnc, they will
+If this file exists and defines options to be passed to \fBXtigervnc\fP, they will
 override any of the same options defined in a user's \fItigervnc.conf\fP file
 or ones given on the command line of this wrapper script. This file offers a
 mechanism to establish some basic form of system-wide policy.
@@ -327,9 +381,9 @@ script that calls Xtigervnc directly to bypass any options defined in the
 .BR tigervncconfig (1),
 .BR tigervncpasswd (1),
 .BR tigervncsession (8),
-.BR x0tigervncserver (1),
 .BR Xtigervnc (1),
-.BR xtigervncviewer (1)
+.BR xtigervncviewer (1),
+.BR x0tigervncserver (1)
 .br
 http://www.tigervnc.org
 .
@@ -337,7 +391,7 @@ http://www.tigervnc.org
 Joachim Falk, Tristan Richardson, RealVNC Ltd., and others.
 .
 VNC was originally developed by the RealVNC team while at Olivetti
-Research Ltd / AT&T Laboratories Cambridge.  TightVNC additions were
+Research Ltd / AT&T Laboratories Cambridge. TightVNC additions were
 implemented by Constantin Kaplinsky. Many other people have since
 participated in development, testing and support. This manual is part
 of the TigerVNC Debian packaging project.
