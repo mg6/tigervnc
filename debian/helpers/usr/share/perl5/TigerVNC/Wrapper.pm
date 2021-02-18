@@ -434,7 +434,7 @@ sub listVncServers {
 
 Kill the specified VNC server.
 
-=cut 
+=cut
 
 #
 # killVncServers
@@ -623,7 +623,7 @@ Start an I<Xtigervnc> or I<X0tigervnc> server.
 
   &startVncServer($options);
 
-=cut 
+=cut
 
 # Now start the X VNC Server
 sub startVncServer {
@@ -733,7 +733,7 @@ sub startVncServer {
       &listVncServers(\*STDERR, $options, \@vncs, $runningVncServers);
       return 1;
     }
-  } 
+  }
   unless (defined $options->{'displayNumber'}) {
     # Find display number.
     $options->{'displayNumber'} = &getDisplayNumber($options->{'rfbport'});
