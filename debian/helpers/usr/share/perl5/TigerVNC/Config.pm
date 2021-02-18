@@ -329,8 +329,7 @@ sub getOptionParseTable($$) {
       [63, 'PasswordFile|rfbauth=s' => 'vncPasswdFile',
        "specifies the password file for security types VncAuth, TLSVnc, and X509Vnc. On default, ~/.vnc/passwd is used." ],
       # Backward compatible command line option
-      [36, 'passwd=s'          => 'vncPasswdFile',
-       "is an alias for PasswordFile."],
+      [36, 'passwd=s'          => 'vncPasswdFile' ],
       [63, 'PlainUsers=s'      => 'PlainUsers',
        "specifies the list of authorized users for the security types Plain, TLSPlain, and X509Plain." ],
       [63, 'PAMService|pam_service=s' => 'PAMService',
