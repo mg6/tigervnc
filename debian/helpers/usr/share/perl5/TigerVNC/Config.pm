@@ -286,6 +286,9 @@ sub getOptionParseTable($$) {
     $options->{'src'}->{$name} = $desc;
   };
 
+  my $server = $options->{'wrapperMode'} eq 'tigervncserver'
+        ? 'Xtigervnc' : 'X0tigervnc';
+
   # Flag field in $optionParseTable
   # 1  => Case insensitive
   # 2  => Config file parameter
@@ -311,6 +314,9 @@ sub getOptionParseTable($$) {
        "if provided, all active VNC servers of the user are listed." ],
       [36, 'cleanstale'        => 'cleanstale',
        "if provided, clean up pid and lockfiles of stale VNC server instances of the user." ],
+      # Options for -version mode
+      [36, 'version'           => 'version',
+       "dumps version information of underlying $server VNC server." ],
       # Options for both tigervncserver and x0tigervncserver
       [53, 'display=s'         => sub {
           if (@_ == 2) {
@@ -1267,7 +1273,7 @@ sub usage {
   }
   {
     my @dumpOpts = grep {
-        !($_ =~ m/^(?:help|kill|clean|list|cleanstale|I-KNOW-THIS-IS-INSECURE)$/)
+        !($_ =~ m/^(?:help|kill|clean|list|cleanstale|version|I-KNOW-THIS-IS-INSECURE)$/)
       } @opts;
     if ($options->{'wrapperMode'} eq 'tigervncserver') {
       &lineBreakText($fh, "  ", "\nTo start a VNC server use $PROG [options] [-- session]");
@@ -1283,6 +1289,10 @@ sub usage {
   {
     &lineBreakText($fh, "  ", "\nTo kill a VNC server use $PROG");
     &{$usageOptionDumping}(qw(kill display rfbport dry-run verbose clean));
+  }
+  {
+    &lineBreakText($fh, "  ", "\nTo dump version information use $PROG");
+    &{$usageOptionDumping}(qw(version));
   }
   if ($options->{'wrapperMode'} eq 'tigervncserver') {
     &lineBreakText($fh, "  ", "\n\nFor further help, consult the $PROG(1) and Xtigervnc(1) manual pages.");
@@ -1399,7 +1409,7 @@ sub getConfig {
   &handleVNCStartupAuto($vncStartup, $opts);
 
   if (defined $opts->{'displayHost'}) {
-    if (!$opts->{'kill'} && !$opts->{'list'}) {
+    if (!$opts->{'kill'} && !$opts->{'list'} && !$opts->{'version'}) {
       $opts->{'usageError'} = 1 if ($opts->{'displayNumber'}||"") eq '*';
     }
   }

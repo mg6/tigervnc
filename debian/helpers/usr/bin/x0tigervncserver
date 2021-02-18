@@ -52,6 +52,13 @@ sub main {
   } elsif ($options->{'list'}) {
     &listVncServers(\*STDOUT, $options);
     exit 0;
+  } elsif ($options->{'version'}) {
+    my @cmd = (&getCommand("X0tigervnc"), "-version");
+    if (system {$cmd[0]} (@cmd)) {
+      exit 1;
+    } else {
+      exit 0;
+    }
   } else {
     if (!defined $options->{'displayNumber'}) {
       if (!defined $ENV{'DISPLAY'}) {
