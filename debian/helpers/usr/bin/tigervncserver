@@ -106,7 +106,7 @@ sub main {
       print STDERR "\n$PROG: Command '", join(" ", @cmd), "' failed: $?\n";
       exit -1;
     }
-    if (!$options->{'kill'} && !$options->{'list'}) {
+    if (!$options->{'kill'} && !$options->{'list'} && !$options->{'version'}) {
       # Feedback on how to connect to the remote tigervnc server.
       print "Use xtigervncviewer -via $options->{'displayHost'} :n to connect!\n";
       print "The display number :n is given in the above startup message from tigervncserver.\n";
