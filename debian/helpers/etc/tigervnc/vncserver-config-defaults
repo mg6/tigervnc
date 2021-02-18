@@ -47,16 +47,16 @@
 # $fontPath should be a comma separated list of fonts to be added to the font
 #           path. If not specified, the default will apply.
 # Example:
-#	$fontPath = "tcp/localhost:7100"; # would force Xtigervnc to use xfs.
+#       $fontPath = "tcp/localhost:7100"; # would force Xtigervnc to use xfs.
 # Example:
-#	$fontPath = "";
-#	$fontPath .= "/usr/share/fonts/X11/misc,";
-#	$fontPath .= "/usr/share/fonts/X11/cyrillic,";
-#	$fontPath .= "/usr/share/fonts/X11/100dpi/:unscaled,";
-#	$fontPath .= "/usr/share/fonts/X11/75dpi/:unscaled,";
-#	$fontPath .= "/usr/share/fonts/X11/Type1,";
-#	$fontPath .= "/usr/share/fonts/X11/100dpi,";
-#	$fontPath .= "/usr/share/fonts/X11/75dpi,";
+#       $fontPath = "";
+#       $fontPath .= "/usr/share/fonts/X11/misc,";
+#       $fontPath .= "/usr/share/fonts/X11/cyrillic,";
+#       $fontPath .= "/usr/share/fonts/X11/100dpi/:unscaled,";
+#       $fontPath .= "/usr/share/fonts/X11/75dpi/:unscaled,";
+#       $fontPath .= "/usr/share/fonts/X11/Type1,";
+#       $fontPath .= "/usr/share/fonts/X11/100dpi,";
+#       $fontPath .= "/usr/share/fonts/X11/75dpi,";
 #
 # Default: $fontPath = undef; # Use Xtigervnc built-in default font path.
 
@@ -126,22 +126,17 @@
 #
 # Default: $desktopName = "${HOSTFQDN}:nn ($USER)" # Where nn is the display number.
 
-# $wmDecoration sets the adjustment of $geometry to accommodate the window decoration
-#               used by the X11 window manager. This is used to fully display
-#               the VNC desktop even if the VNC viewer is not in full screen mode.
-#
-# Default: $wmDecoration = "8x64";
-
-# $geometry sets framebuffer width & height. A default can be derived if the
+# $geometry is is only used by the standalone TigerVNC server. It sets the
+#           framebuffer width & height. A default can be derived if the
 #           tigervncserver is run in a X session -- either $ENV{DISPLAY} or the
 #           session given by $getDefaultFrom -- with the -xdisplaydefaults
 #           option. The geometry can also be changed at the commandline with
 #           the -geometry option. Otherwise, the fixed default provided below
 #           will be used.
 #
-# Default: $geometry ="1920x1200";
+# Default: $geometry = "1920x1200";
 
-# $depth       sets the framebuffer color depth. Must be between 8 and 32.
+# $depth       sets the framebuffer color depth. Must be one of 16, 24, or 32.
 # $pixelformat sets the default pixelformat.
 #              A default can be derived if the tigervncserver is run in a
 #              X session -- either $ENV{DISPLAY} or the session given by
@@ -156,6 +151,12 @@
 # Default: $depth = "24";
 # Default: $pixelformat = undef;
 
+# $wmDecoration sets the adjustment of $geometry to accommodate the window decoration
+#               used by the X11 window manager. This is used to fully display
+#               the VNC desktop even if the VNC viewer is not in full screen mode.
+#
+# Default: $wmDecoration = "8x64";
+
 # $getDefaultFrom sets the display for the -xdisplaydefaults option if
 #                 tigervncserver is not called in an X session, i.e.,
 #                 the $ENV{DISPLAY} variable is not set. The -xdisplaydefaults
@@ -166,6 +167,19 @@
 # Example: $getDefaultFrom = "-display localhost:0";
 #
 # Default: $getDefaultFrom = undef;
+
+# $scrapingGeometry is only used by the scraping TigerVNC server. It specifies
+#                   the screen area that will be shown to VNC clients, e.g.,
+#                   640x480+320+240. The format is <w>x<h>+<xoff>+<yoff>, where
+#                   `+' signs can be replaced with `-' signs to specify offsets
+#                   from the right and/or from the bottom of the screen.
+#                   Offsets are optional, +0+0 is assumed by default (top left
+#                   corner). If the argument is empty, full screen is shown to
+#                   VNC clients (this is the default).
+#
+# Example: $scrapingGeometry = "640x480+320+240";
+#
+# Default: $scrapingGeometry = undef;
 
 # $rfbwait sets the maximum time in msec to wait for VNC client viewer.
 # Default: $rfbwait = "30000";

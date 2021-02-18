@@ -294,6 +294,8 @@ sub getOptionParseTable($$) {
   # 8  => Command line option for Xtigervnc
   # 16 => Command line option for X0tigervnc
 
+  my $storeGeometry;
+
   my @optionParseTable = (
 #     [ flag, 'name=type'      => store        ],
       # Options for -help mode
@@ -580,8 +582,19 @@ sub getOptionParseTable($$) {
       [15, 'AllowOverride=s'   => 'AllowOverride' ],
       [15, 'SendPrimary:b'     => 'SendPrimary' ],
       # Parameters for X0tigervnc (case insensitive)
+      [49, 'Geometry=s'        => $storeGeometry = sub {
+          if (@_ == 2) {
+            my $Geometry = $_[1] // "undef";
+            unless ($Geometry =~ /^(\d+)x(\d+)(?:([+-]\d+)([+-]\d+))?$/) {
+              die "Invalid $_[0] $_[1]!";
+            }
+            &{$override}('Geometry', $_[1]);
+          } else {
+            return $options->{'Geometry'};
+          }
+        },
+        "specifies the screen area that will be shown to VNC clients. The format is widthxheight+xoffset+yoffset, where `+' signs can be replaced with `-' signs to specify offsets from the right and/or from the bottom of the screen. Offsets are optional, +0+0 is assumed by default (top left corner). If the argument is  empty, full screen is shown to VNC clients (this is the default)." ],
       [49, 'HostsFile=s'       => 'HostsFile' ],
-      [49, 'Geometry=s'        => 'Geometry' ],
       [49, 'MaxProcessorUsage=i' => 'MaxProcessorUsage' ],
       [49, 'PollingCycle=i'    => 'PollingCycle' ],
       [49, 'UseSHM:b'          => 'UseSHM' ],
@@ -591,6 +604,7 @@ sub getOptionParseTable($$) {
       [ 2, 'vncStartup=s'      => 'vncStartup' ],
       [ 2, 'xauthorityFile=s'  => 'xauthorityFile' ],
       [ 2, 'getDefaultFrom=s'  => 'getDefaultFrom' ],
+      [ 2, 'scrapingGeometry=s'=> $storeGeometry ],
       # Backward compatible configuration file option for desktop
       [ 2, 'desktopName=s'     => 'desktopName' ],
       # Backward compatible configuration file optionfor PasswordFile
