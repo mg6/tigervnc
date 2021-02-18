@@ -57,6 +57,9 @@ use File::Basename qw(dirname basename);
 
 =item &getCommand
 
+=item &quotedString
+
+
 =back
 
 =cut
@@ -74,6 +77,7 @@ our @EXPORT = qw(
   $SYSTEMCONFIGDIR
   sanityCheck
   getCommand
+  quotedString
 );
 
 our @EXPORT_OK = qw(
@@ -290,6 +294,21 @@ sub getCommand {
   &installPackageError("openssl") if $cmd eq 'openssl';
   &installPackageError("x11-utils") if $cmd eq 'xdpyinfo';
   exit 1;
+}
+
+=pod
+
+=item quotedString
+
+Function that returns a string which yields the original string when parsed
+by a shell.
+
+=cut
+
+sub quotedString {
+  my ($in) = @_;
+  $in =~ s/\'/\'\"\'\"\'/g;
+  return "'$in'";
 }
 
 1;

@@ -203,17 +203,6 @@ sub getDisplayNumber($) {
   exit -1;
 }
 
-#
-# quotedString returns a string which yields the original string when parsed
-# by a shell.
-#
-
-sub quotedString {
-  my ($in) = @_;
-  $in =~ s/\'/\'\"\'\"\'/g;
-  return "'$in'";
-}
-
 sub pidFile {
   my ($options, $rfbport) = @_;
   $rfbport = $options->{'rfbport'} unless defined $rfbport;
