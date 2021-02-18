@@ -139,8 +139,7 @@
 #           the -geometry option. Otherwise, the fixed default provided below
 #           will be used.
 #
-# Default: $geometry ="1280x1024";
-$geometry = "1900x1200";
+# Default: $geometry ="1920x1200";
 
 # $depth       sets the framebuffer color depth. Must be between 8 and 32.
 # $pixelformat sets the default pixelformat.

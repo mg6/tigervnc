@@ -1328,7 +1328,7 @@ sub getConfig {
       desktopName               => undef,
       wmDecoration              =>
         "8x64", # a guess at the typical size for a window manager decoration
-      geometry                  => "1280x1024",
+      geometry                  => "1920x1200",
       depth                     => 24,
       pixelformat               => undef,
       getDefaultFrom            => undef,
