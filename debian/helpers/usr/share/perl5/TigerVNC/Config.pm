@@ -409,8 +409,7 @@ sub getOptionParseTable($$) {
       [15, 'desktop=s'         => 'desktopName',
        "specifies the VNC desktop name." ],
       # Backward compatible command line option
-      [ 4, 'name=s'            => 'desktopName',
-       "is an alias for desktop."],
+      [ 4, 'name=s'            => 'desktopName' ],
       [ 4, 'autokill'          => 'autokill',
        "if enabled, the VNC server is killed after its X session has terminated." ],
       [ 4, 'xstartup:s'        => sub {
