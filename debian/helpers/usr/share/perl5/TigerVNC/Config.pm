@@ -339,7 +339,7 @@ sub getOptionParseTable($$) {
       [63, 'X509Cert=s'        => 'X509Cert',
        "denotes the corresponding X509 certificate (PEM format)." ],
       [36, 'fg'                => 'fg',
-       "if enabled, tigervncserver will stay in the foreground and the VNC server is killed after its X session has terminated." ],
+       "if enabled, $PROG will stay in the foreground and the VNC server is killed after its X session has terminated." ],
       [36, 'useold'            => 'useold',
        "if given, start a VNC server only if one is not already running." ],
       [36, 'verbose'           => 'verbose',
