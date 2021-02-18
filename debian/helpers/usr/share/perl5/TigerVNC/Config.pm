@@ -406,42 +406,6 @@ sub getOptionParseTable($$) {
       [63, 'RemapKeys=s'       => 'RemapKeys' ],
       [63, 'RawKeyboard:b'     => 'RawKeyboard' ],
       # Options only for tigervncserver
-      [15, 'desktop=s'         => 'desktopName',
-       "specifies the VNC desktop name." ],
-      # Backward compatible command line option
-      [ 4, 'name=s'            => 'desktopName' ],
-      [ 4, 'autokill'          => 'autokill',
-       "if enabled, the VNC server is killed after its X session has terminated." ],
-      [ 4, 'xstartup:s'        => sub {
-          if (@_ == 2) {
-            if ($_[1] eq '') {
-              &{$override}('vncStartup', '__AUTO__');
-            } else {
-              &{$override}('vncStartup', $_[1]);
-            }
-          } else {
-            return $options->{'vncStartup'};
-          }
-        },
-       "specifies the script to start an X11 session for Xtigervnc." ],
-      [ 4, 'noxstartup'        => sub {
-          if (@_ == 2) {
-            &{$override}('vncStartup', undef);
-          } else {
-            return !defined $options->{'vncStartup'};
-          }
-        },
-       "disables X session startup." ],
-      [ 4, 'xdisplaydefaults'  => sub {
-          if (@_ == 2) {
-            &getXDisplayDefaults($options);
-          } else {
-            return undef;
-          }
-        },
-       "if given, obtain the geometry and pixelformat from ".(defined $ENV{DISPLAY}
-         ? "the $ENV{DISPLAY} X server."
-         : "a running X server.") ],
       [14, 'geometry=s'        => sub {
           if (@_ == 2) {
             my $geometry = $_[1] // "undef";
@@ -485,8 +449,40 @@ sub getOptionParseTable($$) {
           }
         },
         "if specified, shrinks the geometry by the given <width>x<height> value." ],
-      [14, 'fp=s'              => 'fontPath',
-       "specifies a colon separated list of font locations." ],
+      [ 4, 'xdisplaydefaults'  => sub {
+          if (@_ == 2) {
+            &getXDisplayDefaults($options);
+          } else {
+            return undef;
+          }
+        },
+       "if given, obtain the geometry and pixelformat from ".(defined $ENV{DISPLAY}
+         ? "the $ENV{DISPLAY} X server."
+         : "a running X server.") ],
+      [ 4, 'xstartup:s'        => sub {
+          if (@_ == 2) {
+            if ($_[1] eq '') {
+              &{$override}('vncStartup', '__AUTO__');
+            } else {
+              &{$override}('vncStartup', $_[1]);
+            }
+          } else {
+            return $options->{'vncStartup'};
+          }
+        },
+       "specifies the script to start an X11 session for Xtigervnc." ],
+      [ 4, 'noxstartup'        => sub {
+          if (@_ == 2) {
+            &{$override}('vncStartup', undef);
+          } else {
+            return !defined $options->{'vncStartup'};
+          }
+        },
+       "disables X session startup." ],
+      [15, 'desktop=s'         => 'desktopName',
+       "specifies the VNC desktop name." ],
+      # Backward compatible command line option
+      [ 4, 'name=s'            => 'desktopName' ],
       [14, 'depth=i'           => sub {
           if (@_ == 2) {
             if (defined $_[1]) {
@@ -527,6 +523,10 @@ sub getOptionParseTable($$) {
           }
         },
         "defines the X11 server pixel format. Valid values are rgb888, rgb565, bgr888, or bgr565." ],
+      [ 4, 'autokill'          => 'autokill',
+       "if enabled, the VNC server is killed after its X session has terminated." ],
+      [14, 'fp=s'              => 'fontPath',
+       "specifies a colon separated list of font locations." ],
       [ 6, 'session=s'         => sub {
           if (@_ == 2) {
             my $sn;
