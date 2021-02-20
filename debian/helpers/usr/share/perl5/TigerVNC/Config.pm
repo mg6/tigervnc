@@ -555,12 +555,20 @@ sub getOptionParseTable($$) {
                 $sn = [$sessionCommand];
                 $found = 1;
               } elsif (@{$sn} > 0) {
-                foreach my $dir (split(/:/,$ENV{PATH})) {
-                  my $fqcmd = File::Spec->catfile($dir, $sn->[0]);
+                if ($sn->[0] =~ m{/}) {
+                  my $fqcmd = File::Spec->rel2abs($sn->[0]);
                   if (-x $fqcmd) {
                     $found = 1;
                     $sn->[0] = $fqcmd;
-                    last;
+                  }
+                } else {
+                  foreach my $dir (split(/:/,$ENV{PATH})) {
+                    my $fqcmd = File::Spec->catfile($dir, $sn->[0]);
+                    if (-x $fqcmd) {
+                      $found = 1;
+                      $sn->[0] = $fqcmd;
+                      last;
+                    }
                   }
                 }
               }
