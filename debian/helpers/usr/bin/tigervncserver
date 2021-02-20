@@ -68,7 +68,7 @@ sub main {
     } else {
       push @cmd, ":$options->{'displayNumber'}" if defined $options->{'displayNumber'};
 
-      my $userOptions = {};
+      my $userOptions = { wrapperMode => 'tigervncserver' };
       while (my ($key, $value) = each %{$options}) {
         my $src = $options->{'src'}->{$key} // "undef";
         if ($src eq 'user' || $src eq 'cmdline') {
@@ -83,6 +83,7 @@ sub main {
         next unless $flags & &OPT_TIGERVNCSERVER;
         $optname =~ m/^([^:=|]*)/;
         my $name = $1;
+        next if $name eq 'session';
         my $value = &{$store}($name);
         if ($optname =~ m/:/) {
           push @cmd, "-$name=$value" if defined $value;
