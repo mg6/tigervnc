@@ -453,7 +453,7 @@ sub killVncServers {
         print STDERR "$PROG: No matching VNC server running for this user!\n";
       }
       $retval = 1;
-    } elsif (@{$vncs} > 1) {
+    } elsif (@{$vncs} > 1 && ($options->{'displayNumber'}//'undef') ne '*') {
       print STDERR "$PROG: This is ambiguous. Multiple VNC servers are running for this user!\n";
       &listVncServers(\*STDERR, $options, $vncs, $runningVncServers);
       $retval = 1;
