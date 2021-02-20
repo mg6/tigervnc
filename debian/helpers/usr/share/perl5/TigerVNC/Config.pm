@@ -543,32 +543,32 @@ sub getOptionParseTable($$) {
        "specifies a colon separated list of font locations." ],
       [ 6, 'session=s'         => sub {
           if (@_ == 2) {
-            my $sn;
+            my ($sn, $snt);
             if (!defined($_[1]) || $_[1] eq '') {
-              $sn = [];
+              $sn = $snt = [];
             } elsif (ref($_[1]) eq 'ARRAY') {
-              $sn = $_[1];
+              $sn = $snt = $_[1];
             } elsif (ref($_[1]) eq '') {
               my $sessionCommand = undef;
-              $sn = [split(qr{\s+}, $_[1])];
+              $sn = $snt = [split(qr{\s+}, $_[1])];
               $sessionCommand = loadXSession($_[1]) unless $_[1] =~ m{/};
               my $found = 0;
               if (defined $sessionCommand) {
-                $sn = [$sessionCommand];
+                $snt = [$sessionCommand];
                 $found = 1;
               } elsif (@{$sn} > 0) {
                 if ($sn->[0] =~ m{/}) {
                   my $fqcmd = File::Spec->rel2abs($sn->[0]);
                   if (-x $fqcmd) {
                     $found = 1;
-                    $sn->[0] = $fqcmd;
+                    $snt->[0] = $fqcmd;
                   }
                 } else {
                   foreach my $dir (split(/:/,$ENV{PATH})) {
                     my $fqcmd = File::Spec->catfile($dir, $sn->[0]);
                     if (-x $fqcmd) {
                       $found = 1;
-                      $sn->[0] = $fqcmd;
+                      $snt->[0] = $fqcmd;
                       last;
                     }
                   }
@@ -580,9 +580,10 @@ sub getOptionParseTable($$) {
             } else {
               die "Option $_[0] must be set to a string or array reference!";
             }
-            &{$override}('session', $sn);
+            &{$override}('session-orig', $sn);
+            $options->{'session'} = $snt;
           } else {
-            return $options->{'session'};
+            return $options->{'session-orig'};
           }
         },
        "specifies the X11 session to start with either a command or a session name." ],
