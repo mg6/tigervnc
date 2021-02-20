@@ -135,8 +135,7 @@ Depends:
  ${shlibs:Depends},
  ${misc:Depends},
  ${perl:Depends},
- libfile-readbackwards-perl (>= 1.05),
- netbase,
+ libfile-readbackwards-perl (>= 1.05)
 Description: Virtual network computing; Common software needed by servers
  VNC stands for Virtual Network Computing. It is, in essence, a remote
  display system which allows you to view a computing `desktop' environment

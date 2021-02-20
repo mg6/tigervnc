@@ -127,9 +127,9 @@ our $MAGIC = '3NI3X0 ';
 #
 sub checkTCPPortUsed {
   my ($port) = @_;
-  my $proto  = getprotobyname('tcp');
+  my $proto  = 6; # TCP protocol, i.e., getprotobyname('tcp');
 
-  socket(S, AF_INET, SOCK_STREAM, $proto) || die "$PROG: socket failed: $!";
+  socket(S, PF_INET, SOCK_STREAM, $proto) || die "$PROG: socket failed: $!";
   setsockopt(S, SOL_SOCKET, SO_REUSEADDR, pack("l", 1)) || die "$PROG: setsockopt failed: $!";
   if (!bind(S, sockaddr_in($port, INADDR_ANY))) {
     # print "$PROG: bind ($port) failed: $!\n";
