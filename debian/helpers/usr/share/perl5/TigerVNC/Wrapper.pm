@@ -49,7 +49,7 @@ use Fcntl qw(SEEK_SET SEEK_CUR SEEK_END);
 use Socket;
 use Time::HiRes qw(usleep);
 use Errno qw(:POSIX);
-use POSIX ":sys_wait_h";
+use POSIX qw(:sys_wait_h :fcntl_h setsid);
 
 use TigerVNC::Common;
 use TigerVNC::Config;
@@ -810,235 +810,340 @@ sub startVncServer {
     return 1;
   }
 
-  my $xvncServerPid = undef;
-  {
-    my @cmd;
-    if ($options->{'wrapperMode'} eq 'tigervncserver') {
-      push @cmd, getCommand("Xtigervnc");
-      push @cmd, ":".$options->{'displayNumber'};
-    } else {
-      push @cmd, getCommand("X0tigervnc");
-    }
-    foreach my $optionParseEntry (@{&getOptionParseTable($options)}) {
-      my ($flags, $optname, $store) = @{$optionParseEntry};
-      if ($options->{'wrapperMode'} eq 'x0tigervncserver') {
-        next unless $flags & &OPT_X0TIGERVNC;
-      } else {
-        next unless $flags & &OPT_XTIGERVNC;
-      }
-      $optname =~ m/^([^:=|]*)/;
-      my $name = $1;
-      my $value = &{$store}($name);
-      if ($optname =~ m/:/) {
-        push @cmd, "-$name=$value" if defined $value;
-      } elsif ($optname =~ m/=/) {
-        push @cmd, "-$name", $value if defined $value;
-      } else {
-        die "Oops, can't parse $optname format!";
-      }
-    }
-#   push @cmd, '-pn';
-    push @cmd, map { @{$_->{'args'}} } @{$options->{'vncServerExtraArgs'}};
+  my $terminate = 0;
+  $SIG{TERM} = sub { $terminate = 1; };
+  $SIG{INT}  = sub { $terminate = 1; };
+  $SIG{HUP}  = sub { $terminate = 1; };
 
-    if ($options->{'verbose'} || $options->{'dry-run'}) {
-      print "Starting ",join(" ",@cmd), "\n";
-    }
-    $xvncServerPid = fork();
-    die "Failed to fork: $!" if $xvncServerPid < 0;
+  pipe STATUS_RH, STATUS_WH or die "Can't open pipe: $!";
+  fcntl(STATUS_RH, F_SETFD, FD_CLOEXEC) or
+    print STDERR "$PROG: Oops, setting close on exec failed: $!\n";
+  fcntl(STATUS_WH, F_SETFD, FD_CLOEXEC) or
+    print STDERR "$PROG: Oops, setting close on exec failed: $!\n";
 
-    if ($xvncServerPid == 0) {
-      # I am the child
-      $desktopLogFh->close();
-      open(OLDERR, '>&', \*STDERR); # save old STDERR
-      open(STDOUT, '>>', $desktopLog);
-      open(STDERR, '>>', $desktopLog);
-      STDERR->autoflush(1);
-      STDOUT->autoflush(1);
-      exit 0 if $options->{'dry-run'};
-      exec {$cmd[0]} (@cmd) or
-        print OLDERR "$PROG: Can't exec '".$cmd[0]."': $!\n";
-      exit 1;
-    }
-    $pidFileFh->print($xvncServerPid."\n");
-    $pidFileFh->close();
+  my $childPid = $options->{'fg'} ? 0 : fork();
 
-    $runningVncServers = {
-        $options->{'rfbport'} => {
-            'name'        => "$HOSTFQDN:".$options->{'displayNumber'},
-            'server'      => $options->{'wrapperMode'} eq 'tigervncserver'
-                               ? "Xtigervnc" : "X0tigervnc",
-            'stale'       => 0,
-            'pid'         => $xvncServerPid,
-            'rfbport'     => $options->{'rfbport'},
-            'usedDisplay' => $options->{'displayNumber'},
-          }
+  if ($childPid == 0) {
+    # I am the child
+    close STATUS_RH unless $options->{'fg'};
+
+    my %childStatus;
+    $SIG{CHLD} = sub {
+        while ((my $child = waitpid(-1, WNOHANG)) > 0) {
+          $childStatus{$child} = $?;
+        }
       };
-    # Wait for Xtigervnc to start up
-    unless ($options->{'dry-run'}) {
-      my $i = 300;
-      for (; $i >= 0; $i = $i-1) {
-        last if &checkTCPPortUsed($options->{'rfbport'});
-        if ($xvncServerPid == waitpid($xvncServerPid, WNOHANG)) { $i = -2; last; }
-        usleep 100000;
-      }
+
+    # PID of the Xtigervnc or X0tigervnc server.
+    my $xvncServerPid;
+    # PID of the script starting the applications running in the VNC session.
+    my $vncSessionPid;
+    # X DISPLAY shared by the VNC server.
+    my $DISPLAY;
+    # Error flag for reporting to parent.
+    my $error = 0;
+
+    # Starting up the Xtigervnc or X0tigervnc server.
+    {
+      my @cmd;
       if ($options->{'wrapperMode'} eq 'tigervncserver') {
+        push @cmd, getCommand("Xtigervnc");
+        push @cmd, ":".$options->{'displayNumber'};
+      } else {
+        push @cmd, getCommand("X0tigervnc");
+      }
+      foreach my $optionParseEntry (@{&getOptionParseTable($options)}) {
+        my ($flags, $optname, $store) = @{$optionParseEntry};
+        if ($options->{'wrapperMode'} eq 'x0tigervncserver') {
+          next unless $flags & &OPT_X0TIGERVNC;
+        } else {
+          next unless $flags & &OPT_XTIGERVNC;
+        }
+        $optname =~ m/^([^:=|]*)/;
+        my $name = $1;
+        my $value = &{$store}($name);
+        if ($optname =~ m/:/) {
+          push @cmd, "-$name=$value" if defined $value;
+        } elsif ($optname =~ m/=/) {
+          push @cmd, "-$name", $value if defined $value;
+        } else {
+          die "Oops, can't parse $optname format!";
+        }
+      }
+  #   push @cmd, '-pn';
+      push @cmd, map { @{$_->{'args'}} } @{$options->{'vncServerExtraArgs'}};
+
+      if ($options->{'verbose'} || $options->{'dry-run'}) {
+        print "Starting ",join(" ",@cmd), "\n";
+      }
+      $xvncServerPid = fork();
+      die "Failed to fork: $!" if $xvncServerPid < 0;
+
+      if ($xvncServerPid == 0) {
+        # I am the child
+        close STATUS_RH;
+        close STATUS_WH;
+
+        # Detach ourselves from the terminal
+        setsid() or die "Cannot detach from controlling terminal: $!";
+        # Prevent possibility of acquiring a controlling terminal
+        $SIG{'HUP'} = 'IGNORE';
+
+        $desktopLogFh->close();
+        $desktopLogFh = undef;
+        open(OLDERR, '>&', \*STDERR); # save old STDERR
+        open(STDOUT, '>>', $desktopLog);
+        open(STDERR, '>>', $desktopLog);
+        OLDERR->autoflush(1);
+        STDERR->autoflush(1);
+        STDOUT->autoflush(1);
+        fcntl(OLDERR, F_SETFD, FD_CLOEXEC) or
+          print STDERR "$PROG: Oops, setting close on exec failed: $!\n";
+
+        exit 0 if $options->{'dry-run'};
+        exec {$cmd[0]} (@cmd) or
+          print OLDERR "$PROG: Can't exec '".$cmd[0]."': $!\n";
+        exit 1;
+      }
+      $pidFileFh->print($xvncServerPid."\n");
+      $pidFileFh->close();
+
+      $runningVncServers = {
+          $options->{'rfbport'} => {
+              'name'        => "$HOSTFQDN:".$options->{'displayNumber'},
+              'server'      => $options->{'wrapperMode'} eq 'tigervncserver'
+                                 ? "Xtigervnc" : "X0tigervnc",
+              'stale'       => 0,
+              'pid'         => $xvncServerPid,
+              'rfbport'     => $options->{'rfbport'},
+              'usedDisplay' => $options->{'displayNumber'},
+            }
+        };
+      # Wait for Xtigervnc/X0tigervnc to start up
+      unless ($options->{'dry-run'}) {
+        my $i = 300;
         for (; $i >= 0; $i = $i-1) {
-          last if -e "/tmp/.X11-unix/X$options->{'displayNumber'}" ||
-                  &checkTCPPortUsed(6000 + $options->{'displayNumber'});
-          if ($xvncServerPid == waitpid($xvncServerPid, WNOHANG)) { $i = -2; last; }
+          if (&checkTCPPortUsed($options->{'rfbport'})) {
+            last; # success
+          }
+          if (defined $childStatus{$xvncServerPid}) {
+            $i = -2; last; # error
+          }
+          if ($terminate) {
+            $i = -3; last; # error
+          }
           usleep 100000;
         }
-      }
-      $i = -2 unless kill(0, $xvncServerPid);
-      if ($i < 0) {
-        if (kill(0, $xvncServerPid)) {
-          &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
-        } else {
-          &cleanStale($options, $runningVncServers, $options->{'rfbport'});
+        if ($options->{'wrapperMode'} eq 'tigervncserver') {
+          for (; $i >= 0; $i = $i-1) {
+            if (-e "/tmp/.X11-unix/X$options->{'displayNumber'}" ||
+                &checkTCPPortUsed(6000 + $options->{'displayNumber'})) {
+              last; # success
+            }
+            if (defined $childStatus{$xvncServerPid}) {
+              $i = -2; last; # error
+            }
+            if ($terminate) {
+              $i = -3; last; # error
+            }
+            usleep 100000;
+          }
         }
-        my $header = "=================== tail $desktopLog ===================";
-        print STDERR "\n${header}\n";
-        while (my $line = <$desktopLogFh>) {
-          print STDERR $line;
+        if ($i < 0) {
+          my $status = $childStatus{$xvncServerPid};
+          if (kill(0, $xvncServerPid)) {
+            &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
+          } else {
+            &cleanStale($options, $runningVncServers, $options->{'rfbport'});
+          }
+          if ($i >= -2) {
+            my $header = "=================== tail $desktopLog ===================";
+            print STDERR "\n${header}\n";
+            while (my $line = <$desktopLogFh>) {
+              chomp $line;
+              print STDERR $line, "\n";
+            }
+            print STDERR ("=" x length $header)."\n\n";
+            $error = 1;
+          }
+          if ($i == -1) {
+            print STDERR "$PROG: $cmd[0] did not start up, please look into '$desktopLog' to determine the reason! $i\n";
+          } elsif ($i == -2) {
+            print STDERR "$PROG: $cmd[0] exited with status $status, please look into '$desktopLog' to determine the reason! $i\n";
+          }
+          $xvncServerPid = undef;
+          $runningVncServers = {};
         }
-        print STDERR "\n".("=" x length $header)."\n\n";
-        print STDERR "$PROG: $cmd[0] did not start up, please look into '$desktopLog' to determine the reason! $i\n";
-        return -1;
+      }
+      # Check if Xtigervnc/X0tigervnc has been started up successfully.
+      if (defined $xvncServerPid) {
+        # Xtigervnc/X0tigervnc is running. Thus, report some connection information.
+
+        # If the unix domain socket exists then use that (DISPLAY=:n) otherwise use
+        # TCP (DISPLAY=host:n)
+        $DISPLAY = -e "/tmp/.X11-unix/X$options->{'displayNumber'}"
+          ? ":$options->{'displayNumber'}"
+          : "$HOSTFQDN:$options->{'displayNumber'}";
+        my $rfbport = $options->{'rfbport'};
+        my @status;
+        {
+          my $server = $options->{'wrapperMode'} eq 'tigervncserver'
+            ? 'Xtigervnc' : 'X0tigervnc';
+          push @status, "New $server server '$options->{desktopName}' on port $rfbport for display $DISPLAY.";
+        }
+        {
+          $rfbport -= 5900 if $rfbport >= 5900 && $rfbport <= 5999;
+          my @cmd = ("xtigervncviewer");
+          push @cmd, "-SecurityTypes", $options->{'SecurityTypes'};
+          push @cmd, "-X509CA", $options->{'X509Cert'} if $options->{'x509CertRequired'};
+          push @cmd, "-passwd", $options->{'vncPasswdFile'} if $options->{'vncAuthEnabled'};
+          push @cmd, $options->{'localhost'}
+            ? ":$rfbport" : "$HOSTFQDN:$rfbport";
+          push @status, "Use ".join(" ", @cmd)." to connect to the VNC server.";
+        }
+        print "\n";
+        foreach my $status (@status) {
+          $desktopLogFh->print($MAGIC.$status."\n");
+          print $status."\n";
+        }
+        print "\n";
+        $desktopLogFh->flush();
       }
     }
-  }
+    if (defined($xvncServerPid) &&
+        $options->{'wrapperMode'} eq 'tigervncserver') {
+      if (defined $vncStartup) {
+        # Run the X startup script.
 
-  # If the unix domain socket exists then use that (DISPLAY=:n) otherwise use
-  # TCP (DISPLAY=host:n)
-  my $DISPLAY = -e "/tmp/.X11-unix/X$options->{'displayNumber'}"
-    ? ":$options->{'displayNumber'}"
-    : "$HOSTFQDN:$options->{'displayNumber'}";
-  {
-    my $rfbport = $options->{'rfbport'};
-    my @status;
-    {
-      my $server = $options->{'wrapperMode'} eq 'tigervncserver'
-        ? 'Xtigervnc' : 'X0tigervnc';
-      push @status, "New $server server '$options->{desktopName}' on port $rfbport for display $DISPLAY.";
-    }
-    {
-      $rfbport -= 5900 if $rfbport >= 5900 && $rfbport <= 5999;
-      my @cmd = ("xtigervncviewer");
-      push @cmd, "-SecurityTypes", $options->{'SecurityTypes'};
-      push @cmd, "-X509CA", $options->{'X509Cert'} if $options->{'x509CertRequired'};
-      push @cmd, "-passwd", $options->{'vncPasswdFile'} if $options->{'vncAuthEnabled'};
-      push @cmd, $options->{'localhost'}
-        ? ":$rfbport" : "$HOSTFQDN:$rfbport";
-      push @status, "Use ".join(" ", @cmd)." to connect to the VNC server.";
-    }
-    print "\n";
-    foreach my $status (@status) {
-      $desktopLogFh->print($MAGIC.$status."\n");
-      print $status."\n";
-    }
-    print "\n";
-    $desktopLogFh->flush();
-  }
+        if ($options->{'verbose'}) {
+          print "Starting session",
+            (map { " ".&quotedString($_) } @{$options->{'session'}}),
+            " via ", &quotedString($vncStartup), "\n";
+          print "Log file is $desktopLog\n\n";
+        }
 
-  if ($options->{'wrapperMode'} eq 'tigervncserver') {
-    unless (defined $vncStartup) {
-      if ($options->{'fg'} || $options->{'autokill'}) {
-        # Nothing to start and I should also kill the Xtigervnc server when the
-        # Xtigervnc-session terminates. Well, lets do so. What a pointless exercise.
-        &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
-      }
-      return 0;
-    }
+        seek($desktopLogFh, 0, SEEK_END);
 
-    # Run the X startup script.
-    print "Starting applications specified in $vncStartup\n";
-    print "Log file is $desktopLog\n\n";
+        my @cmd = ($vncStartup);
+        push @cmd, @{$options->{'session'}};
 
-    $ENV{DISPLAY}    = $DISPLAY;
-    $ENV{VNCDESKTOP} = $options->{'desktopName'};
-    seek($desktopLogFh, 0, SEEK_END);
+        $vncSessionPid = fork();
+        die "Failed to fork: $!" if $vncSessionPid < 0;
 
-    pipe RH, WH or die "Can't open pipe: $!";
-    my $childPid = $options->{'fg'} ? 0 : fork();
+        if ($vncSessionPid == 0) {
+          # I am the child
+          close STATUS_RH;
+          close STATUS_WH;
 
-    die "Failed to fork: $!" if $childPid < 0;
+          # Detach ourselves from the terminal
+          setsid() or die "Cannot detach from controlling terminal: $!";
+          # Prevent possibility of acquiring a controlling terminal
+          $SIG{'HUP'} = 'IGNORE';
 
-    if ($childPid == 0) {
-      # I am the child
-      $desktopLogFh->close() unless $options->{'fg'};
-      my @cmd = ($vncStartup);
-      push @cmd, @{$options->{'session'}};
-      print join(" ",@cmd), "\n" if $options->{'verbose'};
+          $desktopLogFh->close();
+          $desktopLogFh = undef;
+          open(OLDERR, '>&', \*STDERR); # save old STDERR
+          open(STDOUT, '>>', $desktopLog);
+          open(STDERR, '>>', $desktopLog);
+          OLDERR->autoflush(1);
+          STDERR->autoflush(1);
+          STDOUT->autoflush(1);
+          fcntl(OLDERR, F_SETFD, FD_CLOEXEC) or
+            print STDERR "$PROG: Oops, setting close on exec failed: $!\n";
 
-      open(OLDOUT, '>&', \*STDOUT); # save old STDOUT
-      open(OLDERR, '>&', \*STDERR); # save old STDERR
-      open(STDOUT, '>>', $desktopLog);
-      open(STDERR, '>>', $desktopLog);
-      STDERR->autoflush(1);
-      STDOUT->autoflush(1);
-      OLDERR->autoflush(1);
-      OLDOUT->autoflush(1);
-
-      $SIG{'ALRM'} = sub {
-          open(OLDERR, '>', '/dev/null') unless $options->{'fg'};
-          open(OLDOUT, '>', '/dev/null') unless $options->{'fg'};
-          syswrite WH, "OK"; close WH;
+          $ENV{DISPLAY}    = $DISPLAY;
+          $ENV{VNCDESKTOP} = $options->{'desktopName'};
+          @cmd = qw(sleep 6) if $options->{'dry-run'};
+          exec {$cmd[0]} (@cmd) or
+            print OLDERR "$PROG: Can't exec '".$cmd[0]."': $!\n";
+          exit 1;
+        }
+        # Wait for three seconds for erros to appear.
+        {
+          my $alarm = 0;
+          $SIG{'ALRM'} = sub { $alarm = 1; };
+          alarm 3;
+          while (!$alarm && !$terminate &&
+                 !defined $childStatus{$vncSessionPid}) {
+            # Wait some more
+            sleep 3600;
+          }
           $SIG{'ALRM'} = 'DEFAULT';
-        };
-      # Wait for three seconds for erros to appear and to propagate to
-      # our parent if not in -fg mode.
-      alarm 3 unless $options->{'fg'};
-      $! = 0;
-      @cmd = qw(sleep 6) if $options->{'dry-run'};
-      if (system {$cmd[0]} (@cmd)) {
-        if ($!) {
-          alarm 0; # this must not be before the if ($!) condition
-          print OLDERR "\n$PROG: Can't start ",
-            join(" ", map { &quotedString($_); } @cmd), ": $!!\n";
-        } else {
-          alarm 0; # this must not be before the if ($!) condition
-          print OLDERR "\n$PROG: Failed command ",
-            join(" ", map { &quotedString($_); } @cmd), ": $?!\n";
         }
-        $SIG{'ALRM'} = 'DEFAULT';
-        syswrite WH, "ERR"; close WH;
-      } else {
-        &{$SIG{'ALRM'}} if ref($SIG{'ALRM'}) eq 'CODE';
+        if (!$terminate && defined $childStatus{$vncSessionPid}) {
+          my $header = "=================== tail $desktopLog ===================";
+          print STDERR "\n${header}\n";
+          while (my $line = <$desktopLogFh>) {
+            chomp $line;
+            print STDERR $line, "\n";
+          }
+          print STDERR ("=" x length $header);
+          print STDERR "\n\nSession startup via ",
+            join(" ", map { &quotedString($_); } @cmd);
+          if ($childStatus{$vncSessionPid} != 0) {
+            my $status = $childStatus{$vncSessionPid};
+            print STDERR " has failed with status $status!\n";
+          } else {
+            print STDERR " has terminated early (< 3 seconds)!\n";
+          }
+          print STDERR "\nMaybe try something simple first, e.g.,\n";
+          print STDERR "\ttigervncserver -xstartup /usr/bin/xterm\n";
+          $error = 1;
+        }
+      } else { # !defined $vncStartup
+        # Nothing to start. Check if autokill is enabled. Then, the Xtigervnc
+        # server must be terminated.
+        $terminate = 2 if $options->{'autokill'};
       }
-      if ($options->{'fg'} || $options->{'autokill'}) {
+    }
+    if (defined $xvncServerPid) {
+      unless ($terminate || $error || $options->{'fg'}) {
+        # Detach ourselves from the terminal
+        setsid() or die "Cannot detach from controlling terminal: $!";
+        # Prevent possibility of acquiring a controlling terminal
+        $SIG{'HUP'} = 'IGNORE';
+
+        $desktopLogFh->close();
+        undef $desktopLogFh;
+        open(STDOUT, '>>', $desktopLog);
+        open(STDERR, '>>', $desktopLog);
+        STDERR->autoflush(1);
+        STDOUT->autoflush(1);
+        syswrite STATUS_WH, ($error ? "ERR" : "OK!");
+      }
+      while (
+        # Check for terminate flag
+        !$terminate &&
+        # Check for error flag
+        !$error &&
+        # Check that the VNC server is still running.
+        !defined($childStatus{$xvncServerPid}) &&
+        # Check that the applications are still running if they were started.
+        (!defined($vncSessionPid) || !defined($childStatus{$vncSessionPid})))
+      {
+        # Wait for SIGCHLD
+        sleep 3600;
+      }
+      if ($terminate || $error || $options->{'autokill'}) {
         if (kill(0, $xvncServerPid)) {
           &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
         } else {
           &cleanStale($options, $runningVncServers, $options->{'rfbport'});
         }
       }
-      exit 0 unless $options->{'fg'};
-      open(STDOUT, '>&', \*OLDOUT); # restore STDOUT
-      open(STDERR, '>&', \*OLDERR); # restore STDERR
     }
-    # I am the parent
-    close WH;
-    my $status;
-    $status = 'ERR' unless defined sysread RH, $status, 3;
-    unless ($status eq 'OK') {
-      if (kill(0, $xvncServerPid)) {
-        &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
-      } else {
-        &cleanStale($options, $runningVncServers, $options->{'rfbport'});
-      }
-      my $header = "=================== tail $desktopLog ===================";
-      print STDERR "\n${header}\n";
-      while (my $line = <$desktopLogFh>) {
-        print STDERR $line;
-      }
-      print STDERR "\n".("=" x length $header)."\n\n";
-      print STDERR "Starting applications specified in $vncStartup has failed.\n";
-      print STDERR "Maybe try something simple first, e.g.,\n";
-      print STDERR "\ttigervncserver -xstartup /usr/bin/xterm\n";
-      return -1;
-    }
+    syswrite STATUS_WH, ($error ? "ERR" : "OK!");
+    exit 0 unless $options->{'fg'};
   }
-  return 0;
+  # I am the parent
+  close STATUS_WH;
+  my $status = "";
+  do {
+    $! = 0;
+    sysread STATUS_RH, $status, 3;
+  } while ($! == EINTR);
+  $status = 'ERR' if $status eq "";
+  return ($status eq 'OK!') ? 0 : -1;
 }
 
 1;
