@@ -50,7 +50,8 @@ tigervncserver \- start or stop a TigerVNC standaloe server
 .IR depth ]
 .RB [ \-pixelformat
 .IR format ]
-.RB [ \-autokill ]
+.RB [ \-autokill
+.RI [ yes | no ]]
 .RB [ \-fp
 .IR font-path ]
 .RI [ "Xtigervnc options..." ]
@@ -137,7 +138,7 @@ Specifies the TCP port on which \fBXtigervnc\fP listens for connections from vie
 is 5900 plus the display number display#.
 .
 .TP
-.B -localhost\fP [\fIyes\fP|\fIno\fP]
+.B \-localhost\fP [\fIyes\fP|\fIno\fP]
 Should the TigerVNC server only listen on localhost for incoming TigerVNC
 connections. Useful if you use SSH and want to stop non-SSH connections from
 any other hosts. If the option is not specified, then the behavior is as
@@ -193,11 +194,8 @@ and ~/.vnc/\fIhost\fP-SrvKey.pem.
 .
 .TP
 .B \-fg
-Runs the Xtigervnc-session as a foreground process. This has two effects: (1)
-The Xtigervnc-session can be aborted with CTRL-C, and (2) the TigerVNC server
-will be killed as soon as the user logs out of the window manager in the
-Xtigervnc-session. This may be necessary when launching TigerVNC from within
-certain grid computing environments.
+Runs the \fBXtigervnc\fP server as a foreground process. Thus, the server can
+be aborted with CTRL-C.
 .
 .TP
 .B \-useold
@@ -270,10 +268,11 @@ next six green, and the least significant five represent blue) and for depth 24
 and 32 is RGB888.
 .
 .TP
-.B \-autokill
-Automatically kills the TigerVNC server whenever the Xtigervnc-session script
-exits. In most cases, this has the effect of terminating \fBXtigervnc\fP when the
-user logs out of the window manager.
+.B \-autokill\fP [\fIyes\fP|\fIno\fP]
+The \fB-autokill\fP option is enabled by default. If enabled, the TigerVNC
+server is automatically killed when the Xtigervnc-session script exits. In most
+cases, this has the effect of terminating \fBXtigervnc\fP when the user logs
+out of the window manager. To disable this, use \fB-autokill\fP \fIno\fP.
 .
 .TP
 .B \-fp \fIfont-path\fP

@@ -347,7 +347,7 @@ sub getOptionParseTable($$) {
       [63, 'X509Cert=s'        => 'X509Cert',
        "denotes the corresponding X509 certificate (PEM format)." ],
       [36, 'fg'                => 'fg',
-       "if enabled, $PROG will stay in the foreground and the VNC server is killed after its X session has terminated." ],
+       "if enabled, $PROG will stay in the foreground." ],
       [36, 'useold'            => 'useold',
        "if given, start a VNC server only if one is not already running." ],
       [36, 'verbose'           => 'verbose',
@@ -531,8 +531,8 @@ sub getOptionParseTable($$) {
           }
         },
         "defines the X11 server pixel format. Valid values are rgb888, rgb565, bgr888, or bgr565." ],
-      [ 4, 'autokill'          => 'autokill',
-       "if enabled, the VNC server is killed after its X session has terminated." ],
+      [ 4, 'autokill:b'        => 'autokill',
+       "if enabled -- the default -- the VNC server is killed after its X session has terminated." ],
       [14, 'fp=s'              => 'fontPath',
        "specifies a colon separated list of font locations." ],
       [ 6, 'session=s'         => sub {
@@ -1329,6 +1329,11 @@ sub getConfig {
   # this purpose.
   #
   my %options = (
+# Values specified via the command line
+      autokill                  => 1,
+      fg                        => 0,
+      useold                    => 0,
+      'dry-run'                 => 0,
 # Values that are documented in /etc/tigervnc/vncserver-config-*
 ## Values declared as system values in /etc/tigervnc/vncserver-config-*
       fontPath                  => undef,
