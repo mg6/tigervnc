@@ -164,6 +164,18 @@ sub checkDisplayNumberAvailable {
   return 0 if &checkTCPPortUsed(6000 + $n);
 
   my $displayLock = 0;
+  my $unixDisplaySocketPath = "/tmp/.X11-unix/X$n";
+
+  socket(S, PF_UNIX, SOCK_STREAM, 0) || die "$PROG: socket failed: $!";
+  if (connect(S, pack_sockaddr_un $unixDisplaySocketPath)) {
+    close(S);
+    return 0;
+  } elsif (-e $unixDisplaySocketPath) {
+    print "\nWarning: $HOSTFQDN:$n is taken because of /tmp/.X11-unix/X$n\n";
+    print "Remove this file if there is no X server $HOSTFQDN:$n\n";
+    $displayLock = 1;
+  }
+  close(S);
 
   if (-e "/tmp/.X$n-lock") {
     print "\nWarning: $HOSTFQDN:$n is taken because of /tmp/.X$n-lock\n";
@@ -171,15 +183,7 @@ sub checkDisplayNumberAvailable {
     $displayLock = 1;
   }
 
-  if (-e "/tmp/.X11-unix/X$n") {
-    print "\nWarning: $HOSTFQDN:$n is taken because of /tmp/.X11-unix/X$n\n";
-    print "Remove this file if there is no X server $HOSTFQDN:$n\n";
-    $displayLock = 1;
-  }
-
-  return 0 if $displayLock;
-
-  return 1;
+  return $displayLock ? 0 : 1;
 }
 
 #
