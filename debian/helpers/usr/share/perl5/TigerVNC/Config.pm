@@ -323,8 +323,10 @@ sub getOptionParseTable($$) {
             die "Invalid display $_[1]!" unless $_[1] =~ m/^:(\d+)$/;
             &{$override}('displayNumber', $1);
             &{$override}('displayHost', $HOSTFQDN);
-          } else {
+          } elsif (defined $options->{'displayNumber'}) {
             return ':'.$options->{'displayNumber'};
+          } else {
+            return undef;
           }
         },
        "specifies the X11 display to be used." ],
@@ -422,7 +424,7 @@ sub getOptionParseTable($$) {
             }
             $options->{'wmDecorationAdjustment'} = undef;
             &{$override}('geometry', $_[1]);
-          } else {
+          } elsif (defined $options->{'geometry'}) {
             $options->{'geometry'} =~ m/^(\d+)x(\d+)$/;
             my ($width, $height) = ($1, $2);
             if ($options->{'wmDecorationAdjustment'}) {
@@ -437,6 +439,8 @@ sub getOptionParseTable($$) {
             $width  = int(($width +3)/4)*4;
             $height = int(($height+1)/2)*2;
             return "${width}x${height}";
+          } else {
+            return undef;
           }
         },
         "specifies the desktop geometry, e.g., <width>x<height>." ],
