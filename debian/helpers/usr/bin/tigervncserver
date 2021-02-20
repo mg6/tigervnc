@@ -72,7 +72,8 @@ sub main {
       while (my ($key, $value) = each %{$options}) {
         my $src = $options->{'src'}->{$key} // "undef";
         if ($src eq 'user' || $src eq 'cmdline') {
-          $userOptions->{$key} = $value;
+          $userOptions->{'src'}->{$key} = $src;
+          $userOptions->{$key}          = $value;
         }
       }
       $userOptions->{'vncServerExtraArgs'} = [grep {

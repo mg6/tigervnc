@@ -486,8 +486,10 @@ sub getOptionParseTable($$) {
       [ 4, 'noxstartup'        => sub {
           if (@_ == 2) {
             &{$override}('vncStartup', undef);
-          } else {
+          } elsif (defined $options->{'src'}->{'vncStartup'}) {
             return !defined $options->{'vncStartup'};
+          } else {
+            return undef;
           }
         },
        "disables X session startup." ],
