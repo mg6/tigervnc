@@ -54,10 +54,10 @@ sub main {
     # Get rid of possible user@ in front of displayHost.
     $options->{'displayHost'} =~ s/^[^@]*@//;
     my @cmd;
-    push @cmd, "-dry-run" if $options->{'dry-run'};
     if ( $options->{'kill'} ) {
       push @cmd, "-kill";
       push @cmd, ":$options->{'displayNumber'}" if defined $options->{'displayNumber'};
+      push @cmd, "-dry-run" if $options->{'dry-run'};
       push @cmd, "-clean" if ($options->{'clean'});
     } elsif ( $options->{'list'} ) {
       push @cmd, "-list";
@@ -79,28 +79,28 @@ sub main {
       $userOptions->{'vncServerExtraArgs'} = [grep {
 	  $_->{'src'} eq 'user' || $_->{'src'} eq 'cmdline';
 	} @{$options->{'vncServerExtraArgs'}}];
+      my @session;
       foreach my $optionParseEntry (@{&getOptionParseTable($userOptions)}) {
         my ($flags, $optname, $store) = @{$optionParseEntry};
         next unless $flags & &OPT_TIGERVNCSERVER;
         $optname =~ m/^([^:=|]*)/;
-        my $name = $1;
-        next if $name eq 'session';
+        my $name  = $1;
         my $value = &{$store}($name);
+        if ($name eq 'session' && defined $value) {
+          @session = @{$value}; next;
+        }
         if ($optname =~ m/:/) {
           push @cmd, "-$name=$value" if defined $value;
         } elsif ($optname =~ m/=/) {
           push @cmd, "-$name", $value if defined $value;
 	} elsif (!($optname =~ m/[:=]/)) {
-          push @cmd, "-$name" if defined $value;
+          push @cmd, "-$name" if $value;
         } else {
           die "Oops, can't parse $optname format!";
         }
       }
       push @cmd, map { @{$_->{'args'}} } @{$userOptions->{'vncServerExtraArgs'}};
-      if ($#{$userOptions->{'session'}} >= 0) {
-        push @cmd, '--';
-        push @cmd, @{$userOptions->{'session'}};
-      }
+      push @cmd, '--', @session if @session > 0;
     }
     @cmd = (@cmdPrefix, map { &quotedString($_); } @cmd);
     print join(" ",@cmd), "\n" if $options->{'verbose'};
