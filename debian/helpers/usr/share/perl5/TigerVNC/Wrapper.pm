@@ -187,7 +187,7 @@ sub checkDisplayNumberAvailable {
 }
 
 #
-# getDisplayNumber gets the lowest available display number.  A display number
+# getDisplayNumber gets the lowest available display number. A display number
 # n is taken if something is listening on the VNC server port (5900+n) or the
 # X server port (6000+n).
 #
@@ -200,7 +200,10 @@ sub getDisplayNumber($) {
     return $n if &checkDisplayNumberAvailable($n);
   }
   foreach my $n (1..99) {
-    return $n if &checkDisplayNumberAvailable($n);
+    if (&checkDisplayNumberAvailable($n)) {
+      return $n if defined $rfbport;
+      return $n if !&checkTCPPortUsed(5900 + $n);
+    }
   }
 
   print STDERR "$PROG: no free display number on $HOSTFQDN.\n";
