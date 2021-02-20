@@ -375,6 +375,22 @@ sub matchVncServers($$$) {
   return @vncs;
 }
 
+sub statusReport($) {
+  my ($status) = @_;
+
+  if (WIFEXITED($status)) {
+    my $exitval = WEXITSTATUS($status);
+    return $exitval == 0
+      ? "cleanly exited"
+      : "exited with status $exitval";
+  } elsif (WIFSIGNALED($status)) {
+    my $termsig = WTERMSIG($status);
+    return "died with signal $termsig";
+  } else {
+    return "died ($status)";
+  }
+}
+
 =pod
 
 =over 4
@@ -950,7 +966,6 @@ sub startVncServer {
           }
         }
         if ($i < 0) {
-          my $status = $childStatus{$xvncServerPid};
           if (kill(0, $xvncServerPid)) {
             &killVncServers($options, [$options->{'rfbport'}], $runningVncServers);
           } else {
@@ -969,7 +984,8 @@ sub startVncServer {
           if ($i == -1) {
             print STDERR "$PROG: $cmd[0] did not start up, please look into '$desktopLog' to determine the reason! $i\n";
           } elsif ($i == -2) {
-            print STDERR "$PROG: $cmd[0] exited with status $status, please look into '$desktopLog' to determine the reason! $i\n";
+            my $status = &statusReport($childStatus{$xvncServerPid});
+            print STDERR "$PROG: $cmd[0] $status, please look into '$desktopLog' to determine the reason! $i\n";
           }
           $xvncServerPid = undef;
           $runningVncServers = {};
@@ -1080,11 +1096,11 @@ sub startVncServer {
           print STDERR ("=" x length $header);
           print STDERR "\n\nSession startup via ",
             join(" ", map { &quotedString($_); } @cmd);
+          my $status = &statusReport($childStatus{$vncSessionPid});
           if ($childStatus{$vncSessionPid} != 0) {
-            my $status = $childStatus{$vncSessionPid};
-            print STDERR " has failed with status $status!\n";
+            print STDERR " $status!\n";
           } else {
-            print STDERR " has terminated early (< 3 seconds)!\n";
+            print STDERR " $status too early (< 3 seconds)!\n";
           }
           print STDERR "\nMaybe try something simple first, e.g.,\n";
           print STDERR "\ttigervncserver -xstartup /usr/bin/xterm\n";
@@ -1123,6 +1139,17 @@ sub startVncServer {
       {
         # Wait for SIGCHLD
         sleep 3600;
+      }
+      if (defined $childStatus{$xvncServerPid}) {
+        $error = 1 if $childStatus{$xvncServerPid} != 0;
+        my $server = $runningVncServers->{$options->{'rfbport'}}->{'server'};
+        my $status = &statusReport($childStatus{$xvncServerPid});
+        print "The $server server $status!\n";
+      }
+      if (defined($vncSessionPid) && defined($childStatus{$vncSessionPid})) {
+        $error = 1 if $childStatus{$vncSessionPid} != 0;
+        my $status = &statusReport($childStatus{$vncSessionPid});
+        print "The X session $status!\n";
       }
       if ($terminate || $error || $options->{'autokill'}) {
         if (kill(0, $xvncServerPid)) {
