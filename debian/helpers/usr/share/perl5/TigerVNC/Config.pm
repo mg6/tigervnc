@@ -573,33 +573,34 @@ sub getOptionParseTable($$) {
             } elsif (ref($_[1]) eq 'ARRAY') {
               $sn = $snt = $_[1];
             } elsif (ref($_[1]) eq '') {
-              my $sessionCommand = undef;
               $sn = $snt = [split(qr{\s+}, $_[1])];
-              $sessionCommand = loadXSession($_[1]) unless $_[1] =~ m{/};
-              my $found = 0;
-              if (defined $sessionCommand) {
-                $snt = [$sessionCommand];
-                $found = 1;
-              } elsif (@{$sn} > 0) {
-                if ($sn->[0] =~ m{/}) {
-                  my $fqcmd = File::Spec->rel2abs($sn->[0]);
-                  if (-x $fqcmd) {
-                    $found = 1;
-                    $snt->[0] = $fqcmd;
-                  }
-                } else {
-                  foreach my $dir (split(/:/,$ENV{PATH})) {
-                    my $fqcmd = File::Spec->catfile($dir, $sn->[0]);
+              unless ($options->{'remote'}) {
+                my $sessionCommand = loadXSession($_[1]) unless $_[1] =~ m{/};
+                my $found = 0;
+                if (defined $sessionCommand) {
+                  $snt = [$sessionCommand];
+                  $found = 1;
+                } elsif (@{$sn} > 0) {
+                  if ($sn->[0] =~ m{/}) {
+                    my $fqcmd = File::Spec->rel2abs($sn->[0]);
                     if (-x $fqcmd) {
                       $found = 1;
                       $snt->[0] = $fqcmd;
-                      last;
+                    }
+                  } else {
+                    foreach my $dir (split(/:/,$ENV{PATH})) {
+                      my $fqcmd = File::Spec->catfile($dir, $sn->[0]);
+                      if (-x $fqcmd) {
+                        $found = 1;
+                        $snt->[0] = $fqcmd;
+                        last;
+                      }
                     }
                   }
                 }
-              }
-              unless ($found) {
-                print STDERR "$PROG: Warning: No X session desktop file or command for $_[1]\n";
+                unless ($found) {
+                  print STDERR "$PROG: Warning: No X session desktop file or command for $_[1]\n";
+                }
               }
             } else {
               die "Option $_[0] must be set to a string or array reference!";
@@ -999,36 +1000,6 @@ sub parseCmdLine {
       }
     }
   }
-  # Separate session arguments
-  {
-    my @newargv;
-    my $ref = \@newargv;
-    my $sn  = [];
-
-    foreach my $entry (@ARGV) {
-      if ($entry eq '--') {
-        $ref = $sn;
-      } else {
-        push @$ref, $entry;
-      }
-    }
-    if ($ref eq $sn) {
-      if (defined $sessionStore) {
-        $sn = $sn->[0] if @{$sn} == 1;
-        unless (eval { &{$sessionStore}('session', $sn); 1 }) {
-          my $errorText = $@;
-          $errorText =~ s/ at .* line \d+\.$//;
-          chomp $errorText;
-          print STDERR "$PROG: Invalid session: $errorText\n\n";
-          $rc = 0;
-        }
-      } else {
-        print STDERR "$PROG: No session arguments allowed!\n\n";
-        $rc = 0;
-      }
-    }
-    @ARGV = @newargv;
-  }
   # Command line parsing
   {
     my $pendingExtraArg = undef;
@@ -1038,7 +1009,24 @@ sub parseCmdLine {
       my $par = undef;
       my $val = undef;
 
-      if (($arg =~ /^((?:[^-:@=.0-9][\w.-]+@)?(?:\d+\.\d+\.\d+\.\d+|\[[0-9a-fA-F:.]+\]|[^-:@=.0-9][^=:@]*))?(?::(\d+(?:\.\d+)?|\*))?$/) &&
+      if ($arg eq '--') {
+        unless (defined $sessionStore) {
+          print STDERR "$PROG: No session arguments allowed!\n\n";
+          $rc = 0;
+          last;
+        }
+        my $sn  = [@ARGV]; @ARGV = ();
+        $sn = $sn->[0] if @{$sn} == 1;
+        unless (eval { &{$sessionStore}('session', $sn); 1 }) {
+          my $errorText = $@;
+          $errorText =~ s/ at .* line \d+\.$//;
+          chomp $errorText;
+          print STDERR "$PROG: Invalid session: $errorText\n\n";
+          $rc = 0;
+          last;
+        }
+        next;
+      } elsif (($arg =~ /^((?:[^-:@=.0-9][\w.-]+@)?(?:\d+\.\d+\.\d+\.\d+|\[[0-9a-fA-F:.]+\]|[^-:@=.0-9][^=:@]*))?(?::(\d+(?:\.\d+)?|\*))?$/) &&
           defined($displayStore) &&
           eval { &{$displayStore}('display', $arg); 1 }) {
 #       print STDERR "==> $arg <==\n";
