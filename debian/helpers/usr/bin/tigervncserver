@@ -86,9 +86,12 @@ sub main {
         $optname =~ m/^([^:=|]*)/;
         my $name  = $1;
         my $value = &{$store}($name);
-        if ($name eq 'session' && defined $value) {
-          @session = @{$value}; next;
+        if ($name eq 'session') {
+          @session = @{$value} if defined $value;
+          next; # Session is a pseudo option, it's given via -- <session>.
         }
+        # Display is already handled
+        next if $name eq 'display';
         if ($optname =~ m/:/) {
           push @cmd, "-$name=$value" if defined $value;
         } elsif ($optname =~ m/=/) {
