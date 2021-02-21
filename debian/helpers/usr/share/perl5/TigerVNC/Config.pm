@@ -133,18 +133,17 @@ our $SYSTEMCONFIGDIR = "/etc/tigervnc";
 #
 
 sub getXDisplayDefaults {
-  my ( $options ) = @_;
+  my ($override, $getDefaultFrom) = @_;
 
   my (@lines, @matchlines, $defaultVisualId, $i);
 
-  return if !defined($ENV{DISPLAY}) &&
-            !defined($options->{'getDefaultFrom'});
+  return if !defined $getDefaultFrom;
 
   my $xdpyinfo = &getCommand("xdpyinfo");
-  if (defined $ENV{DISPLAY}) {
+  {
+    $getDefaultFrom =~ s/^-display\s+//;
+    local $ENV{'DISPLAY'} = $getDefaultFrom;
     @lines = `$xdpyinfo 2>/dev/null`;
-  } else {
-    @lines = `$xdpyinfo $options->{'getDefaultFrom'} 2>/dev/null`;
   }
 
   return if ($? != 0);
@@ -152,8 +151,8 @@ sub getXDisplayDefaults {
   @matchlines = grep(/dimensions/, @lines);
   if (@matchlines) {
     my ($width, $height) = ($matchlines[0] =~ /(\d+)x(\d+) pixels/);
-    $options->{'geometry'} = "${width}x${height}";
-    $options->{'wmDecorationAdjustment'} = 1;
+    &{$override}('geometry', "${width}x${height}");
+    &{$override}('wmDecorationAdjustment', 1);
   }
 
   @matchlines = grep(/default visual id/, @lines);
@@ -173,7 +172,8 @@ sub getXDisplayDefaults {
 
     return if ($i >= @lines);
 
-    ( $options->{'depth'} ) = ($lines[$i+2] =~ /depth:\s+(\d+)/);
+    my ( $depth ) = ($lines[$i+2] =~ /depth:\s+(\d+)/);
+    &{$override}('depth', "$depth");
     my ($red,$green,$blue)
         = ($lines[$i+4]
            =~ /masks:\s+0x([0-9a-f]+), 0x([0-9a-f]+), 0x([0-9a-f]+)/);
@@ -186,12 +186,12 @@ sub getXDisplayDefaults {
       $red = int(log($red) / log(2)) - int(log($green) / log(2));
       $green = int(log($green) / log(2)) - int(log($blue) / log(2));
       $blue = int(log($blue) / log(2)) + 1;
-      $options->{'pixelformat'} = "rgb$red$green$blue";
+      &{$override}('pixelformat', "rgb$red$green$blue");
     } else {
       $blue = int(log($blue) / log(2)) - int(log($green) / log(2));
       $green = int(log($green) / log(2)) - int(log($red) / log(2));
       $red = int(log($red) / log(2)) + 1;
-      $options->{'pixelformat'} = "bgr$blue$green$red";
+      &{$override}('pixelformat', "bgr$blue$green$red");
     }
   }
 }
@@ -487,7 +487,8 @@ sub getOptionParseTable($$) {
         "if specified, shrinks the geometry by the given <width>x<height> value." ],
       [ 4, 'xdisplaydefaults'  => sub {
           if (@_ == 2) {
-            &getXDisplayDefaults($options);
+            &getXDisplayDefaults($override,
+              $ENV{DISPLAY} // $options->{'getDefaultFrom'});
           } else {
             return undef;
           }
