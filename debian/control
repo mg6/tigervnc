@@ -149,7 +149,7 @@ Description: Virtual network computing; Common software needed by servers
 Package: tigervnc-scraping-server
 Architecture: any
 Depends:
- tigervnc-common-server (= ${source:Version}),
+ tigervnc-common-server (= ${binary:Version}),
  ${shlibs:Depends},
  ${misc:Depends},
  ${perl:Depends}
@@ -180,7 +180,7 @@ Depends:
  xkb-data,
  x11-xkb-utils,
  xauth,
- tigervnc-common-server (= ${source:Version}),
+ tigervnc-common-server (= ${binary:Version}),
  ${shlibs:Depends},
  ${misc:Depends},
  ${perl:Depends}
