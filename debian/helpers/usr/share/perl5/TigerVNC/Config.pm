@@ -320,11 +320,35 @@ sub getOptionParseTable($$) {
       # Options for both tigervncserver and x0tigervncserver
       [53, 'display=s'         => sub {
           if (@_ == 2) {
-            die "Invalid display $_[1]!" unless $_[1] =~ m/^:(\d+)$/;
-            &{$override}('displayNumber', $1);
-            &{$override}('displayHost', $HOSTFQDN);
-          } elsif (defined $options->{'displayNumber'}) {
-            return ':'.$options->{'displayNumber'};
+            my ($host, $nr);
+            if ($options->{'wrapperMode'} eq 'tigervncserver') {
+              die "Invalid display $_[1]!" unless
+                $_[1] =~ m/^([^:]*)(?::(\d+(?:\.\d+)?|\*))?$/;
+              ($host, $nr) = ($1, $2);
+            } else {
+              die "Invalid display $_[1]!" unless
+                $_[1] =~ m/^:(\d+(?:\.\d+)?|\*)$/;
+              ($host, $nr) = (undef, $1);
+            }
+            $host =~ s{\[([0-9a-fA-F:.]+)\]$}{$1} if defined $host;
+            $nr   =~ s{\.\d+$}{}                  if defined $nr;
+            &{$override}('display', $_[1]);
+            if (($host//'') eq '' || $host eq $HOST || $host eq $HOSTFQDN) {
+              &{$override}('displayHost', $HOSTFQDN);
+              &{$override}('remote', undef);
+            } elsif ($host eq "localhost") {
+              &{$override}('displayHost', $HOSTFQDN);
+              &{$override}('localhost', 1);
+              &{$override}('remote', undef);
+            } else {
+              &{$override}('displayHost', $host);
+              &{$override}('remote', 1);
+            }
+            if (defined $nr) {
+              &{$override}('displayNumber', $nr);
+            }
+          } elsif (defined $options->{'display'}) {
+            return $options->{'display'};
           } else {
             return undef;
           }
@@ -941,7 +965,7 @@ sub parseCmdLine {
   my $activeFlag = $options->{'wrapperMode'} eq 'tigervncserver'
     ? &OPT_TIGERVNCSERVER : &OPT_X0TIGERVNCSERVER;
 
-  my (%opts, %pars, $sessionStore);
+  my (%opts, %pars, $sessionStore, $displayStore);
   my (%noOpts, %noPars);
   foreach my $optionParseEntry (@{&getOptionParseTable($options, "cmdline")}) {
     my ($flags, $optname, $store) = @{$optionParseEntry};
@@ -953,6 +977,10 @@ sub parseCmdLine {
     if ($flags & $activeFlag) {
       if ($optname eq 'session') {
         $sessionStore = $store;
+        next; # Session is a pseudo option, it's given via -- <session>.
+      }
+      if ($optname eq 'display') {
+        $displayStore = $store;
       }
       foreach my $name (split(/\|/, $optname)) {
         if ($flags & &OPT_PARAM) {
@@ -1010,22 +1038,10 @@ sub parseCmdLine {
       my $par = undef;
       my $val = undef;
 
-      if ($arg =~ /^((?:[^-:@=.0-9][\w.-]+@)?(?:\d+\.\d+\.\d+\.\d+|\[[0-9a-fA-F:.]+\]|[^-:@=.0-9][^=:@]*))?(?::(\d+(?:\.\d+)?|\*))?$/) {
+      if (($arg =~ /^((?:[^-:@=.0-9][\w.-]+@)?(?:\d+\.\d+\.\d+\.\d+|\[[0-9a-fA-F:.]+\]|[^-:@=.0-9][^=:@]*))?(?::(\d+(?:\.\d+)?|\*))?$/) &&
+          defined($displayStore) &&
+          eval { &{$displayStore}('display', $arg); 1 }) {
 #       print STDERR "==> $arg <==\n";
-        my ($host, $nr) = ($1, $2);
-        $host =~ s{\[([0-9a-fA-F:.]+)\]$}{$1} if defined $host;
-        $nr   =~ s{\.\d+$}{}                  if defined $nr;
-        if (!defined $host) {
-          $options->{'displayHost'} = $HOSTFQDN;
-        } elsif ($host eq "localhost") {
-          $options->{'localhost'}   = 'yes';
-          $options->{'displayHost'} = $HOSTFQDN;
-        } else {
-          $options->{'displayHost'} = $host;
-        }
-        if (defined $nr) {
-          $options->{'displayNumber'} = $nr;
-        }
         undef $pendingExtraArg;
         next;
       } elsif ($arg =~ m/^(-([a-zA-Z]))=(.*)$/) {

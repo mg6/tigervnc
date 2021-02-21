@@ -48,8 +48,7 @@ sub main {
   unless (defined $options->{'displayHost'}) {
     $options->{'displayHost'} = $HOSTFQDN;
   }
-  if ($options->{'displayHost'} ne $HOST &&
-      $options->{'displayHost'} ne $HOSTFQDN) {
+  if ($options->{'remote'}) {
     my @cmdPrefix = ("ssh", "$options->{'displayHost'}", "tigervncserver");
     # Get rid of possible user@ in front of displayHost.
     $options->{'displayHost'} =~ s/^[^@]*@//;
