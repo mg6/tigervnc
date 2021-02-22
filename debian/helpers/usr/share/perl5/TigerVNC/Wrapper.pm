@@ -694,7 +694,7 @@ sub startVncServer {
       ! -f '/etc/pam.d/tigervnc') {
     print STDERR "$PROG: The tigervnc PAM servcice required for the security types\n";
     print STDERR "\tPlain, TLSPlain, or X509Plain is not installed.\n";
-    &installPackageError("tigervnc-common-server");
+    &installPackageError("tigervnc-common");
   }
 
   unless (defined $options->{'localhost'}) {

@@ -95,7 +95,7 @@ is not present, then
 .BR tigervncserver (1)
 expects to use the\fB tigervnc\fP PAM service to authenticate the passwords of
 users when any of the \fI*Plain\fP security types are used.  Note that the
-tigervnc-common-server package provides the PAM service configuration file
+tigervnc-common package provides the PAM service configuration file
 .IR /etc/pam.d/tigervnc .
 Otherwise, if
 .I /etc/pam.d/vnc

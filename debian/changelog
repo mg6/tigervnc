@@ -9,7 +9,7 @@ tigervnc (1.11.0+dfsg-1) unstable; urgency=medium
   * Remove obsolete field Name from debian/upstream/metadata (already present in
     machine-readable debian/copyright).
 
- -- Joachim Falk <joachim.falk@gmx.de>  Sun, 21 Feb 2021 13:56:55 +0100
+ -- Joachim Falk <joachim.falk@gmx.de>  Mon, 22 Feb 2021 18:19:01 +0100
 
 tigervnc (1.10.1+dfsg-9) unstable; urgency=medium
 
