@@ -1,3 +1,11 @@
+tigervnc (1.11.0+dfsg-2) unstable; urgency=medium
+
+  [ Joachim Falk ]
+  * Properly handle boolean configuration values in tigervnc-standalone-server
+    (Closes: #985614).
+
+ -- Joachim Falk <joachim.falk@gmx.de>  Mon, 22 Mar 2021 22:21:54 +0100
+
 tigervnc (1.11.0+dfsg-1) unstable; urgency=medium
 
   [ Joachim Falk ]

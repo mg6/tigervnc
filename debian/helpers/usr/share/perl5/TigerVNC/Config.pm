@@ -402,7 +402,7 @@ sub getOptionParseTable($$) {
               &{$override}('shared', undef);
             }
           } elsif (defined $options->{'shared'}) {
-            return $options->{'shared'} eq 'never';
+            return $options->{'shared'} eq 'never' ? 1 : 0;
           } else {
             return undef;
           }
@@ -415,7 +415,7 @@ sub getOptionParseTable($$) {
               &{$override}('shared', undef);
             }
           } elsif (defined $options->{'shared'}) {
-            return $options->{'shared'} eq 'always';
+            return $options->{'shared'} eq 'always' ? 1 : 0;
           } else {
             return undef;
           }

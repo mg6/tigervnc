@@ -10,6 +10,7 @@
 0205-defined-CMAKE_INSTALL_FULL_BINDIR.patch
 0210-use-tigervncsession-name.patch
 0220-remove-systemd-service-obsolete-syslog-target.patch
+0300-fix-Xtigervnc-boolparam-parsing.patch
 
 # These patches are lifted from RedHat
 rh/0904-Added-RH-patch-tigervnc11-rh588342.patch-which-fixes.patch
