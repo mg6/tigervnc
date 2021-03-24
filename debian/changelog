@@ -1,3 +1,11 @@
+tigervnc (1.11.0+dfsg-3~RC1) UNRELEASED; urgency=medium
+
+  [ Joachim Falk ]
+  * Fixed warnings use of uninitialized value in string eq at
+    /usr/share/perl5/TigerVNC/Config.pm line 401 or 414.
+
+ -- Joachim Falk <joachim.falk@gmx.de>  Wed, 24 Mar 2021 19:02:16 +0100
+
 tigervnc (1.11.0+dfsg-2) unstable; urgency=medium
 
   [ Joachim Falk ]

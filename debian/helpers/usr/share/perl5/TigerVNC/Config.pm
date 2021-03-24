@@ -398,7 +398,8 @@ sub getOptionParseTable($$) {
           if (@_ == 2) {
             if ($_[1] eq '' || $_[1] eq '1') {
               &{$override}('shared', 'never');
-            } elsif ($options->{'shared'} eq 'never') {
+            } elsif (defined($options->{'shared'}) &&
+                     $options->{'shared'} eq 'never') {
               &{$override}('shared', undef);
             }
           } elsif (defined $options->{'shared'}) {
@@ -411,7 +412,8 @@ sub getOptionParseTable($$) {
           if (@_ == 2) {
             if ($_[1] eq '' || $_[1] eq '1') {
               &{$override}('shared', 'always');
-            } elsif ($options->{'shared'} eq 'always') {
+            } elsif (defined($options->{'shared'}) &&
+                     $options->{'shared'} eq 'always') {
               &{$override}('shared', undef);
             }
           } elsif (defined $options->{'shared'}) {
