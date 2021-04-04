@@ -4,8 +4,9 @@ tigervnc (1.11.0+dfsg-3~RC1) UNRELEASED; urgency=medium
   * Fixed warnings use of uninitialized value in string eq at
     /usr/share/perl5/TigerVNC/Config.pm line 401 or 414.
   * Fixed debian/watch to again detect upstream versions.
+  * Bumped Standards-Version: to 4.5.1. No changes needed.
 
- -- Joachim Falk <joachim.falk@gmx.de>  Wed, 24 Mar 2021 22:14:23 +0100
+ -- Joachim Falk <joachim.falk@gmx.de>  Fri, 26 Mar 2021 00:30:17 +0100
 
 tigervnc (1.11.0+dfsg-2) unstable; urgency=medium
 
