@@ -53,8 +53,7 @@
 #include "cocoa.h"
 #endif
 
-#define EDGE_SCROLL_SIZE 32
-#define EDGE_SCROLL_SPEED 20
+#define EDGE_SCROLL_SIZE 2
 
 using namespace rfb;
 
@@ -1377,19 +1376,15 @@ void DesktopWindow::handleEdgeScroll(void *data)
     my = self->h();
 
   if ((self->viewport->x() < 0) && (mx < EDGE_SCROLL_SIZE))
-    dx = EDGE_SCROLL_SPEED -
-         EDGE_SCROLL_SPEED * mx / EDGE_SCROLL_SIZE;
+    dx = self->w();
   if ((self->viewport->x() + self->viewport->w() > self->w()) &&
       (mx > self->w() - EDGE_SCROLL_SIZE))
-    dx = EDGE_SCROLL_SPEED * (self->w() - mx) / EDGE_SCROLL_SIZE -
-         EDGE_SCROLL_SPEED;
+    dx = -self->w();
   if ((self->viewport->y() < 0) && (my < EDGE_SCROLL_SIZE))
-    dy = EDGE_SCROLL_SPEED -
-         EDGE_SCROLL_SPEED * my / EDGE_SCROLL_SIZE;
+    dy = self->h();
   if ((self->viewport->y() + self->viewport->h() > self->h()) &&
       (my > self->h() - EDGE_SCROLL_SIZE))
-    dy = EDGE_SCROLL_SPEED * (self->h() - my) / EDGE_SCROLL_SIZE -
-         EDGE_SCROLL_SPEED;
+    dy = -self->h();
 
   if ((dx == 0) && (dy == 0))
     return;
